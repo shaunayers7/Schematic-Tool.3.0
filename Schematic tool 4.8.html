@@ -830,7 +830,10 @@
         renderSummary();
         var img = document.getElementById('planImage');
         if (img) {
-          img.onload = function() { if (state.activeLevelId === targetLevel.id) fitSchematicFullSize(); };
+          img.onload = function() {
+            if (state.activeLevelId === targetLevel.id) fitSchematicFullSize();
+            img.onload = null;
+          };
           img.src = targetLevel.imageData;
         }
         showToast('Loaded schematic for ' + targetLevel.name, 'success');
@@ -1614,7 +1617,7 @@
       }
 
       if (lvl && lvl.imageData) {
-        imgEl.src = lvl.imageData;
+        if (imgEl.getAttribute('src') !== lvl.imageData) imgEl.src = lvl.imageData;
         imgEl.style.display = 'block';
         uploadOverlay.style.display = 'none';
         imgEl.classList.toggle('hd-enhance', state.isHDEnhance);
