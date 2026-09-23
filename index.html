@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schematic Tool 3.0</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111827;
+      --panel: #1f2937;
+      --border: #374151;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --accent: #3b82f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .app {
+      width: min(900px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: grid;
+      gap: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 280px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0b1220;
+      color: var(--text);
+      padding: 12px;
+      font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 8px 12px;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1>Schematic Tool 3.0</h1>
+    <p>Self-contained HTML app shell. Paste or edit your app code below, then save/export as needed.</p>
+    <textarea id="appCode" spellcheck="false"><!-- Put your app code here --></textarea>
+    <div class="controls">
+      <button id="copyBtn" type="button">Copy Code</button>
+      <button id="resetBtn" class="secondary" type="button">Reset</button>
+      <span id="status" aria-live="polite"></span>
+    </div>
+  </main>
+  <script>
+    const defaultValue = "<!-- Put your app code here -->";
+    const appCode = document.getElementById("appCode");
+    const copyBtn = document.getElementById("copyBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const status = document.getElementById("status");
+
+    const saved = localStorage.getItem("schematic-tool-3-code");
+    if (saved !== null) appCode.value = saved;
+
+    appCode.addEventListener("input", () => {
+      localStorage.setItem("schematic-tool-3-code", appCode.value);
+      status.textContent = "Saved locally";
+    });
+
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(appCode.value);
+        status.textContent = "Copied";
+      } catch {
+        status.textContent = "Copy failed";
+      }
+    });
+
+    resetBtn.addEventListener("click", () => {
+      appCode.value = defaultValue;
+      localStorage.removeItem("schematic-tool-3-code");
+      status.textContent = "Reset";
+    });
+  </script>
+</body>
+</html>
