@@ -434,7 +434,9 @@
       if (!lvl) return;
 
       var hist = getFloorHistory(lvl.id);
-      hist.undo.push(JSON.stringify(cloneLevel(lvl)));
+      var snapshot = getCurrentLevelSnapshot(lvl.id);
+      if (!snapshot) return;
+      hist.undo.push(JSON.stringify(snapshot));
       if (hist.undo.length > 18) hist.undo.shift();
       hist.redo = [];
       updateUndoRedoButtons();
@@ -447,12 +449,10 @@
       var hist = getFloorHistory(lvl.id);
       if (hist.undo.length === 0) return;
 
-      hist.redo.push(JSON.stringify(cloneLevel(lvl)));
+      var currentSnapshot = getCurrentLevelSnapshot(lvl.id);
+      hist.redo.push(JSON.stringify(currentSnapshot));
       var prevLevel = JSON.parse(hist.undo.pop());
-      var idx = state.levels.findIndex(function(level) { return level.id === lvl.id; });
-      if (idx >= 0) {
-        state.levels[idx] = Object.assign({}, prevLevel, { markers: prevLevel.markers || [], lines: prevLevel.lines || [] });
-      }
+      restoreLevelSnapshot(lvl.id, prevLevel);
 
       saveData();
       renderAll();
@@ -466,12 +466,10 @@
       var hist = getFloorHistory(lvl.id);
       if (hist.redo.length === 0) return;
 
-      hist.undo.push(JSON.stringify(cloneLevel(lvl)));
+      var currentSnapshot = getCurrentLevelSnapshot(lvl.id);
+      hist.undo.push(JSON.stringify(currentSnapshot));
       var nextLevel = JSON.parse(hist.redo.pop());
-      var idx = state.levels.findIndex(function(level) { return level.id === lvl.id; });
-      if (idx >= 0) {
-        state.levels[idx] = Object.assign({}, nextLevel, { markers: nextLevel.markers || [], lines: nextLevel.lines || [] });
-      }
+      restoreLevelSnapshot(lvl.id, nextLevel);
 
       saveData();
       renderAll();
@@ -483,6 +481,30 @@
       var hist = getFloorHistory(lvl ? lvl.id : state.activeLevelId);
       document.getElementById('undoBtn').disabled = (hist.undo.length === 0);
       document.getElementById('redoBtn').disabled = (hist.redo.length === 0);
+    }
+
+    function getCurrentLevelSnapshot(levelId) {
+      var found = state.levels.find(function(level) { return level.id === levelId; });
+      if (!found) return null;
+      return JSON.parse(JSON.stringify({
+        id: found.id,
+        name: found.name,
+        imageData: found.imageData,
+        markers: found.markers || [],
+        lines: found.lines || []
+      }));
+    }
+
+    function restoreLevelSnapshot(levelId, snapshot) {
+      if (!snapshot) return;
+      var idx = state.levels.findIndex(function(level) { return level.id === levelId; });
+      if (idx < 0) return;
+      state.levels[idx] = Object.assign({}, snapshot, {
+        id: levelId,
+        markers: snapshot.markers || [],
+        lines: snapshot.lines || [],
+        imageData: snapshot.imageData || null
+      });
     }
 
     var zoomScale = 1;
@@ -747,9 +769,10 @@
             var dist = Math.hypot(dx, dy);
             var nx = -dy / dist;
             var ny = dx / dist;
-            var scaledArc = a * (w / 1000) * 5;
-            var cx = mx + nx * scaledArc;
-            var cy = my + ny * scaledArc;
+            var curveScale = Math.min(1, dist / 35);
+            var cx = mx + nx * (a * curveScale);
+            var cy = my + ny * (a * curveScale);
+            ctx.moveTo(x1, y1);
             ctx.quadraticCurveTo(cx, cy, x2, y2);
           } else {
             ctx.moveTo(x1, y1);
@@ -953,8 +976,9 @@
       if (dist < 0.001) return 'M ' + x1 + ' ' + y1 + ' L ' + x2 + ' ' + y2;
       var nx = -dy / dist;
       var ny = dx / dist;
-      var cx = mx + nx * a;
-      var cy = my + ny * a;
+      var curveScale = Math.min(1, dist / 35);
+      var cx = mx + nx * (a * curveScale);
+      var cy = my + ny * (a * curveScale);
       return 'M ' + x1 + ' ' + y1 + ' Q ' + cx + ' ' + cy + ' ' + x2 + ' ' + y2;
     }
 
@@ -1399,14 +1423,32 @@
 
     function selectNewDevRadialColor(rgba) { selectedNewDevColor = rgba; renderNewDevColorGrid(); }
     function selectNewDevIcon(icon) { selectedNewDevIcon = icon; renderNewDevIconGrid(); }
-    function selectLineColor(solidColor) { activeLineColor = solidColor; renderLineColorGrid(); }
+    function selectLineColor(solidColor, updateLastLine) {
+      activeLineColor = solidColor;
+      renderLineColorGrid();
+
+      if (updateLastLine !== false) {
+        var lvl = getActiveLevel();
+        if (lvl && lvl.lines && lvl.lines.length > 0) {
+          var targetLine = state.selectedLineId ?
+            lvl.lines.find(function(l) { return l.id === state.selectedLineId; }) :
+            lvl.lines[lvl.lines.length - 1];
+          if (targetLine) {
+            pushUndo();
+            targetLine.color = activeLineColor;
+            saveData();
+            renderLines();
+          }
+        }
+      }
+    }
 
     function renderLineColorGrid() {
       var grid = document.getElementById('lineColorGrid');
       var html = '';
       PRESET_COLORS.forEach(function(c) {
         var isActive = (activeLineColor === c.solid) ? 'active' : '';
-        html += '<div class="radial-dial ' + isActive + '" style="background:' + c.solid + '" onclick="selectLineColor(\'' + c.solid + '\')"></div>';
+        html += '<div class="radial-dial ' + isActive + '" style="background:' + c.solid + '" onclick="selectLineColor(\'' + c.solid + '\', true)"></div>';
       });
       grid.innerHTML = html;
     }
