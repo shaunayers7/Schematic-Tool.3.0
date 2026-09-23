@@ -841,6 +841,7 @@
 
     function switchLevel(lvlId) {
       state.activeLevelId = lvlId;
+      state.selectedLineId = null;
       renderAll();
     }
 
@@ -1250,6 +1251,7 @@
           if (lvl) {
             pushUndo();
             var newLineId = 'line_' + Date.now();
+            state.selectedLineId = newLineId;
             lvl.lines.push({
               id: newLineId,
               x1Pct: state.lineStart.xPct,
@@ -1674,8 +1676,8 @@
     function renderAll() {
       renderClientSelect();
       updateMarkerSize(state.markerSize);
-      updateLineThickness(state.lineThickness);
-      setLineStyle(state.lineStyle);
+      updateLineThickness(state.lineThickness, false);
+      setLineStyle(state.lineStyle, false);
       updateLineArc(state.lineArc, false);
 
       renderTabs();
