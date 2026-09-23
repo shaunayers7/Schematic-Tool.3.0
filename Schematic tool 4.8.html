@@ -154,8 +154,9 @@
       <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportJPG()">🖼️ JPG</button>
       <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportPDF()">📄 PDF</button>
       <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportProjectJSON()">💾 Save .ebproj</button>
+      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportAllClients()">⬇️ Backup All</button>
       <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="document.getElementById('importFile').click()">📂 Open</button>
-      <input type="file" id="importFile" accept=".json,.ebproj" style="display:none;" onchange="importProjectJSON(event)">
+      <input type="file" id="importFile" accept=".json,.ebproj,.ebbackup" style="display:none;" onchange="importProjectJSON(event)">
 
       <button class="btn btn-danger" style="padding: 4px 7px; font-size: 11px;" onclick="confirmClearActiveLevel()" title="Clear Level Content">🗑️ Clear</button>
     </div>
@@ -357,6 +358,12 @@
       } catch(e) { return fallback; }
     }
 
+    function escapeHtml(str) {
+      return String(str == null ? '' : str).replace(/[&<>"']/g, function(ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
+
     var selectedNewDevColor = PRESET_COLORS[0].rgba;
     var selectedNewDevIcon = PRESET_ICONS[0];
     var activeLineColor = PRESET_COLORS[0].solid;
@@ -420,8 +427,9 @@
 
     function getFloorHistory(levelId) {
       if (!levelId) levelId = state.activeLevelId;
-      if (!floorHistory[levelId]) floorHistory[levelId] = { undo: [], redo: [] };
-      return floorHistory[levelId];
+      var key = state.activeClientId + '::' + levelId;
+      if (!floorHistory[key]) floorHistory[key] = { undo: [], redo: [] };
+      return floorHistory[key];
     }
 
     function cloneLevel(level) {
@@ -518,7 +526,7 @@
       var toast = document.createElement('div');
       toast.className = 'toast toast-' + type;
       var icon = type === 'success' ? '✅' : type === 'warning' ? '⚠️' : type === 'danger' ? '🚨' : 'ℹ️';
-      toast.innerHTML = '<span>' + icon + '</span><span>' + message + '</span>';
+      toast.innerHTML = '<span>' + icon + '</span><span>' + escapeHtml(message) + '</span>';
       container.appendChild(toast);
 
       setTimeout(function() {
@@ -553,7 +561,10 @@
         localStorage.setItem('eb_linethickness_v51', JSON.stringify(state.lineThickness));
         localStorage.setItem('eb_linestyle_v51', JSON.stringify(state.lineStyle));
         localStorage.setItem('eb_linearc_v51', JSON.stringify(state.lineArc));
-      } catch(e) {}
+      } catch(e) {
+        console.error('saveData failed', e);
+        showToast('Auto-save failed (storage full?). Export a backup now!', 'danger');
+      }
     }
 
     /* Client Directory */
@@ -562,7 +573,7 @@
       var html = '';
       state.clients.forEach(function(c) {
         var selAttr = c.id === state.activeClientId ? 'selected' : '';
-        html += '<option value="' + c.id + '" ' + selAttr + '>' + c.name + '</option>';
+        html += '<option value="' + c.id + '" ' + selAttr + '>' + escapeHtml(c.name) + '</option>';
       });
       sel.innerHTML = html;
     }
@@ -597,8 +608,8 @@
         var isActive = c.id === state.activeClientId;
         html += '<div class="client-item ' + (isActive ? 'active' : '') + '">';
         html += '  <div style="flex:1;" onclick="switchClient(\'' + c.id + '\'); closeClientManager();">';
-        html += '    <div style="font-weight:bold; font-size:13px; color:#f8fafc;">' + c.name + '</div>';
-        html += '    <div style="font-size:11px; color:#94a3b8;">' + (c.address || 'No address set') + '</div>';
+        html += '    <div style="font-weight:bold; font-size:13px; color:#f8fafc;">' + escapeHtml(c.name) + '</div>';
+        html += '    <div style="font-size:11px; color:#94a3b8;">' + escapeHtml(c.address || 'No address set') + '</div>';
         html += '  </div>';
         if (state.clients.length > 1) {
           html += '  <button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" onclick="deleteClient(\'' + c.id + '\')">Delete</button>';
@@ -679,16 +690,27 @@
       var reader = new FileReader();
       reader.onload = function(e) {
         try {
-          var importedClient = JSON.parse(e.target.result);
-          if (!importedClient.id || !importedClient.levels) {
+          var parsed = JSON.parse(e.target.result);
+
+          if (Array.isArray(parsed)) {
+            importAllClients(parsed);
+            return;
+          }
+
+          if (!parsed || !parsed.id || !Array.isArray(parsed.levels)) {
             showToast('Invalid project file format', 'danger');
             return;
           }
 
           pushUndo();
-          importedClient.id = 'client_' + Date.now();
-          state.clients.push(importedClient);
-          state.activeClientId = importedClient.id;
+          parsed.id = 'client_' + Date.now();
+          parsed.devices = Array.isArray(parsed.devices) ? parsed.devices : JSON.parse(JSON.stringify(DEFAULT_DEVICES));
+          parsed.levels.forEach(function(lvl) {
+            lvl.markers = Array.isArray(lvl.markers) ? lvl.markers : [];
+            lvl.lines = Array.isArray(lvl.lines) ? lvl.lines : [];
+          });
+          state.clients.push(parsed);
+          state.activeClientId = parsed.id;
           syncActiveClientFromState();
 
           saveData();
@@ -699,6 +721,35 @@
         }
       };
       reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function exportAllClients() {
+      syncActiveClientToState();
+      var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.clients, null, 2));
+      var downloadAnchor = document.createElement('a');
+      var filename = 'electric_boyes_full_backup_' + new Date().toISOString().slice(0, 10) + '.ebbackup';
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", filename);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('Full backup saved as ' + filename, 'success');
+    }
+
+    function importAllClients(clientsArray) {
+      if (!clientsArray.length) {
+        showToast('Backup file has no client data', 'danger');
+        return;
+      }
+      showConfirm('Restore Full Backup', 'This replaces ALL current clients (' + state.clients.length + ') with ' + clientsArray.length + ' from the backup file. Continue?', function() {
+        state.clients = clientsArray;
+        state.activeClientId = clientsArray[0].id;
+        syncActiveClientFromState();
+        saveData();
+        renderAll();
+        showToast('Full backup restored', 'success');
+      });
     }
 
     function exportJPG() {
@@ -1184,17 +1235,7 @@
       pinchZoom.active = false;
     });
 
-    /* Click-To-Delete Handlers */
-    function removeMarker(markerId, e) {
-      if (e) e.stopPropagation();
-      var lvl = getActiveLevel();
-      if (!lvl) return;
-      pushUndo();
-      lvl.markers = lvl.markers.filter(function(m) { return m.id !== markerId; });
-      saveData();
-      renderAll();
-      showToast('Device marker removed', 'info');
-    }
+    /* Click-To-Delete Handlers (markers removed via proximity check in handleCanvasClick) */
 
     function removeLine(lineId, e) {
       if (e) e.stopPropagation();
@@ -1530,9 +1571,17 @@
       });
 
       text += '\n------------------------------------\nGRAND TOTAL: $' + grandTotal.toFixed(2);
-      navigator.clipboard.writeText(text).then(function() {
-        showToast('Summary copied to clipboard!', 'success');
-      });
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          showToast('Summary copied to clipboard!', 'success');
+        }).catch(function() {
+          showToast('Clipboard blocked by browser - copy manually', 'warning');
+          console.log(text);
+        });
+      } else {
+        showToast('Clipboard unavailable in this browser', 'warning');
+        console.log(text);
+      }
     }
 
     function renderTabs() {
@@ -1540,10 +1589,38 @@
       var html = '';
       state.levels.forEach(function(lvl) {
         var activeClass = lvl.id === state.activeLevelId ? 'active' : '';
-        html += '<button class="tab-btn ' + activeClass + '" onclick="switchLevel(\'' + lvl.id + '\')">' + lvl.name + '</button>';
+        html += '<button class="tab-btn ' + activeClass + '" onclick="switchLevel(\'' + lvl.id + '\')" ondblclick="renameLevel(\'' + lvl.id + '\')" title="Double-click to rename">' + escapeHtml(lvl.name) + '</button>';
       });
       html += '<button class="add-tab-btn" onclick="addNewLevel()">+ Level</button>';
+      if (state.levels.length > 1) {
+        html += '<button class="add-tab-btn" style="background:#7f1d1d;" onclick="deleteLevel(\'' + state.activeLevelId + '\')" title="Delete current floor">🗑️ Floor</button>';
+      }
       container.innerHTML = html;
+    }
+
+    function renameLevel(lvlId) {
+      var lvl = state.levels.find(function(l) { return l.id === lvlId; });
+      if (!lvl) return;
+      var name = prompt('Rename floor:', lvl.name);
+      if (!name || !name.trim()) return;
+      pushUndo();
+      lvl.name = name.trim();
+      saveData();
+      renderAll();
+    }
+
+    function deleteLevel(lvlId) {
+      if (state.levels.length <= 1) return;
+      var lvl = state.levels.find(function(l) { return l.id === lvlId; });
+      if (!lvl) return;
+      showConfirm('Delete Floor', 'Delete "' + lvl.name + '" and all its markers/lines? This cannot be undone.', function() {
+        state.levels = state.levels.filter(function(l) { return l.id !== lvlId; });
+        delete floorHistory[state.activeClientId + '::' + lvlId];
+        if (state.activeLevelId === lvlId) state.activeLevelId = state.levels[0].id;
+        saveData();
+        renderAll();
+        showToast('Floor deleted', 'danger');
+      });
     }
 
     function renderDevicePalette() {
@@ -1558,10 +1635,10 @@
         html += '<div class="device-card ' + (isSelected ? 'selected' : '') + '" onclick="selectDevice(\'' + dev.id + '\')">';
         html += '  <div class="device-header">';
         html += '    <div class="device-info">';
-        html += '      <div class="symbol-badge" onclick="toggleCardIconPicker(\'' + dev.id + '\', event)">' + (dev.icon || '📍') + '</div>';
+        html += '      <div class="symbol-badge" onclick="toggleCardIconPicker(\'' + dev.id + '\', event)">' + escapeHtml(dev.icon || '📍') + '</div>';
         html += '      <div>';
         html += '        <div style="display:flex; align-items:center; gap:6px;">';
-        html += '          <span class="device-name">' + dev.name + '</span>';
+        html += '          <span class="device-name">' + escapeHtml(dev.name) + '</span>';
         html += '          <span class="active-badge">ACTIVE</span>';
         html += '        </div>';
         html += '        <div style="font-size:11px; color:#94a3b8;">Count: <b style="color:#34d399;">' + count + '</b> | Subtotal: <b style="color:#34d399;">$' + (count * dev.price).toFixed(2) + '</b></div>';
@@ -1639,10 +1716,6 @@
           markerEl.style.backgroundColor = dev.color;
           markerEl.innerText = '';
           markerEl.title = dev.name + ' (Click to remove)';
-          
-          markerEl.onclick = function(e) {
-            removeMarker(m.id, e);
-          };
 
           overlay.appendChild(markerEl);
         });
