@@ -42,6 +42,10 @@
     .device-card { background: #1e293b; border: 2px solid transparent; border-radius: 8px; padding: 8px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; transition: all 0.15s ease; user-select: none; }
     .device-card:hover { border-color: #334155; }
     .device-card.selected { border-color: #10b981; background: #091322; box-shadow: 0 0 10px rgba(16, 185, 129, 0.2); }
+    .device-card.drag-over { border-color: #34d399; box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.4); }
+    .device-card.dragging { opacity: 0.4; }
+    .drag-handle { cursor: grab; color: #475569; font-size: 14px; padding: 0 2px; flex-shrink: 0; touch-action: none; }
+    .drag-handle:active { cursor: grabbing; }
     
     .active-badge { display: none; background: #10b981; color: #020617; font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 4px; text-transform: uppercase; }
     .device-card.selected .active-badge { display: inline-block; }
@@ -1469,24 +1473,9 @@
 
     function selectNewDevRadialColor(rgba) { selectedNewDevColor = rgba; renderNewDevColorGrid(); }
     function selectNewDevIcon(icon) { selectedNewDevIcon = icon; renderNewDevIconGrid(); }
-    function selectLineColor(solidColor, updateLastLine) {
+    function selectLineColor(solidColor) {
       activeLineColor = solidColor;
       renderLineColorGrid();
-
-      if (updateLastLine !== false) {
-        var lvl = getActiveLevel();
-        if (lvl && lvl.lines && lvl.lines.length > 0) {
-          var targetLine = state.selectedLineId ?
-            lvl.lines.find(function(l) { return l.id === state.selectedLineId; }) :
-            lvl.lines[lvl.lines.length - 1];
-          if (targetLine) {
-            pushUndo();
-            targetLine.color = activeLineColor;
-            saveData();
-            renderLines();
-          }
-        }
-      }
     }
 
     function renderLineColorGrid() {
@@ -1494,7 +1483,7 @@
       var html = '';
       PRESET_COLORS.forEach(function(c) {
         var isActive = (activeLineColor === c.solid) ? 'active' : '';
-        html += '<div class="radial-dial ' + isActive + '" style="background:' + c.solid + '" onclick="selectLineColor(\'' + c.solid + '\', true)"></div>';
+        html += '<div class="radial-dial ' + isActive + '" style="background:' + c.solid + '" onclick="selectLineColor(\'' + c.solid + '\')"></div>';
       });
       grid.innerHTML = html;
     }
@@ -1623,6 +1612,48 @@
       });
     }
 
+    var draggedDeviceId = null;
+
+    function handleDeviceDragStart(e, devId) {
+      draggedDeviceId = devId;
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', devId); } catch(err) {}
+      e.currentTarget.classList.add('dragging');
+    }
+
+    function handleDeviceDragOver(e, devId) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (devId !== draggedDeviceId) e.currentTarget.classList.add('drag-over');
+    }
+
+    function handleDeviceDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+
+    function handleDeviceDrop(e, targetDevId) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      if (!draggedDeviceId || draggedDeviceId === targetDevId) return;
+
+      var fromIdx = state.devices.findIndex(function(d) { return d.id === draggedDeviceId; });
+      var toIdx = state.devices.findIndex(function(d) { return d.id === targetDevId; });
+      if (fromIdx < 0 || toIdx < 0) return;
+
+      pushUndo();
+      var moved = state.devices.splice(fromIdx, 1)[0];
+      state.devices.splice(toIdx, 0, moved);
+      saveData();
+      renderAll();
+      showToast('Reordered devices', 'info');
+      draggedDeviceId = null;
+    }
+
+    function handleDeviceDragEnd(e) {
+      e.currentTarget.classList.remove('dragging');
+      draggedDeviceId = null;
+    }
+
     function renderDevicePalette() {
       var container = document.getElementById('devicePalette');
       var activeLvl = getActiveLevel();
@@ -1632,9 +1663,10 @@
         var isSelected = (state.toolMode === 'marker' && dev.id === state.activeDeviceId);
         var count = activeLvl ? activeLvl.markers.filter(function(m) { return m.deviceId === dev.id; }).length : 0;
 
-        html += '<div class="device-card ' + (isSelected ? 'selected' : '') + '" onclick="selectDevice(\'' + dev.id + '\')">';
+        html += '<div class="device-card ' + (isSelected ? 'selected' : '') + '" draggable="true" ondragstart="handleDeviceDragStart(event, \'' + dev.id + '\')" ondragover="handleDeviceDragOver(event, \'' + dev.id + '\')" ondragleave="handleDeviceDragLeave(event)" ondrop="handleDeviceDrop(event, \'' + dev.id + '\')" ondragend="handleDeviceDragEnd(event)" onclick="selectDevice(\'' + dev.id + '\')">';
         html += '  <div class="device-header">';
         html += '    <div class="device-info">';
+        html += '      <span class="drag-handle" title="Drag to reorder" onclick="event.stopPropagation()">⠿</span>';
         html += '      <div class="symbol-badge" onclick="toggleCardIconPicker(\'' + dev.id + '\', event)">' + escapeHtml(dev.icon || '📍') + '</div>';
         html += '      <div>';
         html += '        <div style="display:flex; align-items:center; gap:6px;">';
