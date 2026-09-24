@@ -121,19 +121,22 @@
 
     /* Zoom Menu */
     .zoom-controls { position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, 0.90); backdrop-filter: blur(8px); border: 1px solid #334155; padding: 4px 6px; border-radius: 8px; display: flex; align-items: center; gap: 4px; z-index: 300; }
-    .pan-hint { position: absolute; top: 10px; right: 10px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); border: 1px solid #334155; padding: 4px 8px; border-radius: 20px; font-size: 10px; color: #94a3b8; pointer-events: none; z-index: 300; }
-    .focus-toggle { position: absolute; right: 10px; bottom: 10px; z-index: 400; }
-    body.focus-mode header { display: none; }
-    body.focus-mode .app-body { height: 100dvh; }
-    body.focus-mode .sidebar { display: none; }
-    body.focus-mode .focus-toggle { background: #10b981; color: #020617; }
+    .pan-hint { display: none; }
+    .menu-chevron { position: absolute; right: 10px; z-index: 400; min-width: 32px; padding: 4px 8px; }
+    .top-menu-toggle { top: 10px; }
+    .side-menu-toggle { top: 48px; }
+    body.top-menu-hidden header { display: none; }
+    body.side-menu-hidden .sidebar { display: none; }
+    body.top-menu-hidden .app-body,
+    body.side-menu-hidden .app-body { height: 100dvh; }
 
     @media (max-width: 768px) {
-      body.focus-mode .workspace { height: 100dvh !important; }
+      body.top-menu-hidden .workspace,
+      body.side-menu-hidden .workspace { height: 100dvh !important; }
     }
 
     /* Notifications & Modals */
-    .toast-container { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    .toast-container { position: fixed; top: 70px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
     .toast { pointer-events: auto; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6); display: flex; align-items: center; gap: 8px; border-left: 4px solid #10b981; max-width: 300px; }
     .toast.toast-warning { border-left-color: #f59e0b; }
     .toast.toast-danger { border-left-color: #ef4444; }
@@ -147,6 +150,16 @@
     .client-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
     .client-item { background: #1e293b; border: 1px solid #334155; padding: 8px 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
     .client-item.active { border-color: #10b981; background: #091322; }
+
+    .tools-menu { position: relative; }
+    .tools-menu-panel { position: absolute; top: calc(100% + 6px); right: 0; display: none; flex-direction: column; gap: 5px; min-width: 170px; padding: 7px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 12px 24px rgba(0, 0, 0, 0.55); z-index: 800; }
+    .tools-menu-panel.open { display: flex; }
+    .tools-menu-panel .btn { width: 100%; justify-content: flex-start; }
+
+    @media (max-width: 768px) {
+      .toast-container { top: 124px; right: 10px; }
+      .tools-menu-panel { position: fixed; top: 112px; right: 10px; }
+    }
   </style>
 </head>
 <body>
@@ -168,13 +181,18 @@
       <button class="btn btn-secondary" id="undoBtn" onclick="undo()" disabled title="Undo">↩️</button>
       <button class="btn btn-secondary" id="redoBtn" onclick="redo()" disabled title="Redo">↪️</button>
       
-      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportSummary()">📋 Summary</button>
-      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportJPG()">🖼️ JPG</button>
-      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportPDF()">📄 PDF</button>
-      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportProjectJSON()">💾 Save .ebproj</button>
-      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportAllClients()">⬇️ Backup All</button>
-      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="document.getElementById('importFile').click()">📂 Open</button>
-      <input type="file" id="importFile" accept=".json,.ebproj,.ebbackup" style="display:none;" onchange="importProjectJSON(event)">
+      <div class="tools-menu">
+        <button class="btn btn-secondary" id="toolsMenuButton" style="padding: 4px 8px; font-size: 11px;" onclick="toggleToolsMenu(event)" title="Open file and export tools">☰ Tools</button>
+        <div class="tools-menu-panel" id="toolsMenuPanel">
+          <button class="btn btn-secondary" onclick="runToolAction(exportSummary)">📋 Summary</button>
+          <button class="btn btn-secondary" onclick="runToolAction(exportJPG)">🖼️ JPG</button>
+          <button class="btn btn-secondary" onclick="runToolAction(exportPDF)">📄 PDF</button>
+          <button class="btn btn-secondary" onclick="runToolAction(exportProjectJSON)">💾 Save .ebproj</button>
+          <button class="btn btn-secondary" onclick="runToolAction(exportAllClients)">⬇️ Backup All</button>
+          <button class="btn btn-secondary" onclick="runOpenTool()">📂 Open</button>
+        </div>
+        <input type="file" id="importFile" accept=".json,.ebproj,.ebbackup" style="display:none;" onchange="importProjectJSON(event)">
+      </div>
 
       <button class="btn btn-danger" style="padding: 4px 7px; font-size: 11px;" onclick="confirmClearActiveLevel()" title="Clear Level Content">🗑️ Clear</button>
     </div>
@@ -297,8 +315,8 @@
         <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 10px;" onclick="document.getElementById('fileInput').click()">📁 Load Plan</button>
       </div>
 
-      <div class="pan-hint">💡 Drag to Pan • Click dots/lines to delete</div>
-      <button class="btn btn-secondary focus-toggle" id="focusToggle" onclick="toggleFocusMode()" title="Hide menus and show the full schematic">⛶ Focus</button>
+      <button class="btn btn-secondary menu-chevron top-menu-toggle" id="topMenuToggle" onmousedown="stopMenuToggleEvent(event)" ontouchstart="stopMenuToggleEvent(event)" onclick="toggleTopMenu(event)" title="Hide top menu">⌃</button>
+      <button class="btn btn-secondary menu-chevron side-menu-toggle" id="sideMenuToggle" onmousedown="stopMenuToggleEvent(event)" ontouchstart="stopMenuToggleEvent(event)" onclick="toggleSideMenu(event)" title="Hide side menu">‹</button>
 
       <div class="plan-container" id="planContainer">
         <img id="planImage" class="plan-image" style="display:none;" />
@@ -401,7 +419,8 @@
       lineStyle: loadData('eb_linestyle_v51', 'dotted'),
       lineArc: loadData('eb_linearc_v51', 0),
       isHDEnhance: false,
-      focusMode: false,
+      topMenuHidden: false,
+      sideMenuHidden: false,
       isDrawingLine: false,
       lineStart: { xPct: 0, yPct: 0 },
       devices: DEFAULT_DEVICES,
@@ -1083,12 +1102,50 @@
       showToast(state.isHDEnhance ? 'HD image enhancement enabled' : 'HD image enhancement disabled', 'info');
     }
 
-    function toggleFocusMode() {
-      state.focusMode = !state.focusMode;
-      document.body.classList.toggle('focus-mode', state.focusMode);
-      var button = document.getElementById('focusToggle');
-      button.innerText = state.focusMode ? '↙ Exit Focus' : '⛶ Focus';
-      button.title = state.focusMode ? 'Show menus and estimate summary' : 'Hide menus and show the full schematic';
+    function stopMenuToggleEvent(event) {
+      if (event) event.stopPropagation();
+    }
+
+    function toggleToolsMenu(event) {
+      stopMenuToggleEvent(event);
+      document.getElementById('toolsMenuPanel').classList.toggle('open');
+    }
+
+    function closeToolsMenu() {
+      document.getElementById('toolsMenuPanel').classList.remove('open');
+    }
+
+    function runToolAction(action) {
+      closeToolsMenu();
+      action();
+    }
+
+    function runOpenTool() {
+      closeToolsMenu();
+      document.getElementById('importFile').click();
+    }
+
+    function updateMenuToggleButtons() {
+      var topButton = document.getElementById('topMenuToggle');
+      var sideButton = document.getElementById('sideMenuToggle');
+      topButton.innerText = state.topMenuHidden ? '⌄' : '⌃';
+      topButton.title = state.topMenuHidden ? 'Show top menu' : 'Hide top menu';
+      sideButton.innerText = state.sideMenuHidden ? '›' : '‹';
+      sideButton.title = state.sideMenuHidden ? 'Show side menu' : 'Hide side menu';
+    }
+
+    function toggleTopMenu(event) {
+      stopMenuToggleEvent(event);
+      state.topMenuHidden = !state.topMenuHidden;
+      document.body.classList.toggle('top-menu-hidden', state.topMenuHidden);
+      updateMenuToggleButtons();
+    }
+
+    function toggleSideMenu(event) {
+      stopMenuToggleEvent(event);
+      state.sideMenuHidden = !state.sideMenuHidden;
+      document.body.classList.toggle('side-menu-hidden', state.sideMenuHidden);
+      updateMenuToggleButtons();
     }
 
     function fitSchematicFullSize() {
@@ -1385,9 +1442,16 @@
       pushUndo();
       lvl.markers = lvl.markers.filter(function(m) { return m.id !== existing.id; });
       saveData();
-      renderAll();
+      refreshMarkerView();
       showToast('Device marker removed', 'info');
       return true;
+    }
+
+    function refreshMarkerView() {
+      renderCanvas();
+      renderDevicePalette();
+      renderSummary();
+      updateUndoRedoButtons();
     }
 
     function handleCanvasClick(event) {
@@ -1397,7 +1461,7 @@
       var point = getCanvasPointFromEvent(event);
       if (!point) return;
 
-      if (!state.focusMode && removeExistingMarkerAtPoint(point.xPct, point.yPct, event)) return;
+      if (!state.topMenuHidden && !state.sideMenuHidden && removeExistingMarkerAtPoint(point.xPct, point.yPct, event)) return;
       if (!state.activeDeviceId) return;
 
       pushUndo();
@@ -1409,7 +1473,7 @@
       });
 
       saveData();
-      renderAll();
+      refreshMarkerView();
     }
 
     function renderPreviewLine(x1, y1, x2, y2, color, thickness, style, arc) {
@@ -1844,6 +1908,7 @@
       renderSummary();
       toggleCustomDeviceForm(document.getElementById('newDevName') ? document.getElementById('newDevName').value : '');
       updateUndoRedoButtons();
+      updateMenuToggleButtons();
     }
 
     renderAll();
