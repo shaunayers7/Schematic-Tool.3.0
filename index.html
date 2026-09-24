@@ -232,6 +232,18 @@
 
         <div>
           <div class="section-title">Devices & Symbols</div>
+          <div class="scan-settings" style="margin-bottom: 8px;">
+            <div class="section-title" style="margin-bottom: 0;">Display Settings</div>
+            <button class="btn btn-hd" id="hdBtn" onclick="toggleHDEnhance()">✨ HD Lines: OFF</button>
+
+            <div class="slider-container">
+              <div style="display: flex; justify-content: space-between;">
+                <span>Dot Size:</span>
+                <b id="markerSizeVal" style="color: #34d399;">28px</b>
+              </div>
+              <input type="range" id="markerSizeSlider" class="slider" min="5" max="60" value="28" oninput="updateMarkerSize(this.value)">
+            </div>
+          </div>
           <div id="devicePalette" style="display: flex; flex-direction: column; gap: 8px;"></div>
         </div>
 
@@ -253,18 +265,6 @@
           </div>
         </div>
 
-        <div class="scan-settings">
-          <div class="section-title" style="margin-bottom: 0;">Display Settings</div>
-          <button class="btn btn-hd" id="hdBtn" onclick="toggleHDEnhance()">✨ HD Lines: OFF</button>
-
-          <div class="slider-container">
-            <div style="display: flex; justify-content: space-between;">
-              <span>Dot Size:</span>
-              <b id="markerSizeVal" style="color: #34d399;">28px</b>
-            </div>
-            <input type="range" id="markerSizeSlider" class="slider" min="5" max="60" value="28" oninput="updateMarkerSize(this.value)">
-          </div>
-        </div>
       </div>
 
       <!-- Always Visible Footer Summary -->
