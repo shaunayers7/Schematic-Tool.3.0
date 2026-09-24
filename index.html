@@ -220,7 +220,7 @@
               <span>Thickness:</span>
               <b id="lineThicknessVal" style="color: #34d399;">4px</b>
             </div>
-            <input type="range" id="lineThicknessSlider" class="slider" min="1" max="16" value="4" oninput="updateLineThickness(this.value)">
+            <input type="range" id="lineThicknessSlider" class="slider" min="1" max="16" value="4" oninput="updateLineThickness(this.value, true)">
           </div>
 
           <div>
@@ -259,7 +259,7 @@
                 <span>Dot Size:</span>
                 <b id="markerSizeVal" style="color: #34d399;">28px</b>
               </div>
-              <input type="range" id="markerSizeSlider" class="slider" min="5" max="60" value="28" oninput="updateMarkerSize(this.value)">
+              <input type="range" id="markerSizeSlider" class="slider" min="5" max="60" value="28" oninput="updateMarkerSize(this.value, true)">
             </div>
           </div>
           <div id="devicePalette" style="display: flex; flex-direction: column; gap: 8px;"></div>
@@ -419,6 +419,7 @@
       toolMode: 'marker',
       activeLevelId: 'lvl_main',
       activeDeviceId: 'dev_potlight',
+      lastMarkerDeviceId: 'dev_potlight',
       selectedLineId: null,
       openColorPickerDevId: null,
       openIconPickerDevId: null,
@@ -471,6 +472,8 @@
     syncActiveClientFromState();
 
     var floorHistory = {};
+    var saveTimer = null;
+    var sliderUndoState = { thickness: false, arc: false };
 
     function getFloorHistory(levelId) {
       if (!levelId) levelId = state.activeLevelId;
@@ -614,6 +617,16 @@
         console.error('saveData failed', e);
         showToast('Auto-save failed (storage full?). Export a backup now!', 'danger');
       }
+    }
+
+    function scheduleSaveData() {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(function() {
+        saveTimer = null;
+        sliderUndoState.thickness = false;
+        sliderUndoState.arc = false;
+        saveData();
+      }, 250);
     }
 
     /* Client Directory */
@@ -974,11 +987,11 @@
     }
 
     /* Controls & Drawing Modes */
-    function updateMarkerSize(val) {
+    function updateMarkerSize(val, persist) {
       state.markerSize = parseInt(val, 10) || 28;
       document.documentElement.style.setProperty('--marker-size', state.markerSize + 'px');
       document.getElementById('markerSizeVal').innerText = state.markerSize + 'px';
-      saveData();
+      if (persist) scheduleSaveData();
     }
 
     function updateLineThickness(val, updateLastLine) {
@@ -993,14 +1006,16 @@
             lvl.lines.find(function(l) { return l.id === state.selectedLineId; }) :
             lvl.lines[lvl.lines.length - 1];
           if (targetLine) {
-            pushUndo();
+            if (!sliderUndoState.thickness) {
+              pushUndo();
+              sliderUndoState.thickness = true;
+            }
             targetLine.thickness = state.lineThickness;
-            saveData();
             renderLines();
           }
         }
       }
-      saveData();
+      if (updateLastLine !== false) scheduleSaveData();
     }
 
     function setLineStyle(style, updateLastLine) {
@@ -1022,8 +1037,8 @@
             renderLines();
           }
         }
+        saveData();
       }
-      saveData();
     }
 
     function updateLineArc(val, updateLastLine) {
@@ -1044,14 +1059,16 @@
             lvl.lines.find(function(l) { return l.id === state.selectedLineId; }) : 
             lvl.lines[lvl.lines.length - 1];
           if (targetLine) {
-            pushUndo();
+            if (!sliderUndoState.arc) {
+              pushUndo();
+              sliderUndoState.arc = true;
+            }
             targetLine.arc = state.lineArc;
-            saveData();
             renderLines();
           }
         }
       }
-      saveData();
+      if (updateLastLine) scheduleSaveData();
     }
 
     function flipArcDirection() {
@@ -1093,7 +1110,8 @@
       document.getElementById('lineColorSection').style.display = (mode === 'line') ? 'flex' : 'none';
       if (mode === 'line') state.activeDeviceId = null;
       else if (mode === 'marker' && !state.activeDeviceId && state.devices.length > 0) {
-        state.activeDeviceId = state.devices[0].id;
+        var rememberedDevice = state.devices.find(function(dev) { return dev.id === state.lastMarkerDeviceId; });
+        state.activeDeviceId = rememberedDevice ? rememberedDevice.id : state.devices[0].id;
       }
       renderDevicePalette();
     }
@@ -1291,13 +1309,6 @@
     }, { passive: false });
 
     workspaceEl.addEventListener('touchmove', function(e) {
-      if (state.toolMode === 'line') {
-        if (e.touches.length === 1 && state.isDrawingLine) {
-          handleMouseMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
-        }
-        return;
-      }
-
       if (e.touches.length === 2 && pinchZoom.active) {
         e.preventDefault();
         var dist = getTouchDistance(e.touches);
@@ -1311,6 +1322,13 @@
           panY = centerY - rect.top - pinchZoom.contentY * newScale;
           zoomScale = newScale;
           updateTransform();
+        }
+        return;
+      }
+
+      if (state.toolMode === 'line') {
+        if (e.touches.length === 1 && state.isDrawingLine) {
+          handleMouseMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
         }
         return;
       }
@@ -1329,6 +1347,14 @@
     }, { passive: false });
 
     workspaceEl.addEventListener('touchend', function(e) {
+      if (pinchZoom.active) {
+        pinchZoom.active = false;
+        pendingPan = null;
+        state.isDrawingLine = false;
+        removePreviewLine();
+        return;
+      }
+
       if (state.toolMode === 'line') {
         handleMouseUp({ button: 0, clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY });
         return;
@@ -1533,6 +1559,7 @@
 
     function selectDevice(devId) {
       state.activeDeviceId = devId;
+      state.lastMarkerDeviceId = devId;
       state.openColorPickerDevId = null;
       state.openIconPickerDevId = null;
       setToolMode('marker');
@@ -1652,6 +1679,9 @@
         });
         if (state.activeDeviceId === devId && state.devices.length > 0) {
           state.activeDeviceId = state.devices[0].id;
+        }
+        if (state.lastMarkerDeviceId === devId) {
+          state.lastMarkerDeviceId = state.devices.length > 0 ? state.devices[0].id : null;
         }
         saveData();
         renderAll();
@@ -1920,6 +1950,16 @@
       updateUndoRedoButtons();
       updateMenuToggleButtons();
     }
+
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden && saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        sliderUndoState.thickness = false;
+        sliderUndoState.arc = false;
+        saveData();
+      }
+    });
 
     renderAll();
     setTimeout(function() {
