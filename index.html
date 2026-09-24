@@ -190,6 +190,8 @@
           <button class="btn btn-secondary" onclick="runToolAction(exportProjectJSON)">💾 Save .ebproj</button>
           <button class="btn btn-secondary" onclick="runToolAction(exportAllClients)">⬇️ Backup All</button>
           <button class="btn btn-secondary" onclick="runOpenTool()">📂 Open</button>
+          <button class="btn btn-secondary" onclick="runToolAction(function() { rotateActiveSchematic(-90); })">↶ Rotate Left</button>
+          <button class="btn btn-secondary" onclick="runToolAction(function() { rotateActiveSchematic(90); })">↷ Rotate Right</button>
         </div>
         <input type="file" id="importFile" accept=".json,.ebproj,.ebbackup" style="display:none;" onchange="importProjectJSON(event)">
       </div>
@@ -925,6 +927,66 @@
       if (lvl && !lvl.lines) lvl.lines = [];
       if (lvl && !lvl.markers) lvl.markers = [];
       return lvl;
+    }
+
+    function rotatePercentPoint(xPct, yPct, degrees) {
+      if (degrees === 90) return { xPct: 100 - yPct, yPct: xPct };
+      return { xPct: yPct, yPct: 100 - xPct };
+    }
+
+    function rotateActiveSchematic(degrees) {
+      var lvl = getActiveLevel();
+      if (!lvl || !lvl.imageData) {
+        showToast('No schematic loaded for this floor', 'warning');
+        return;
+      }
+
+      var source = new Image();
+      source.onload = function() {
+        pushUndo();
+        var canvas = document.createElement('canvas');
+        canvas.width = source.naturalHeight;
+        canvas.height = source.naturalWidth;
+        var ctx = canvas.getContext('2d');
+
+        if (degrees === 90) {
+          ctx.translate(canvas.width, 0);
+          ctx.rotate(Math.PI / 2);
+        } else {
+          ctx.translate(0, canvas.height);
+          ctx.rotate(-Math.PI / 2);
+        }
+        ctx.drawImage(source, 0, 0);
+        lvl.imageData = canvas.toDataURL('image/png');
+
+        lvl.markers.forEach(function(marker) {
+          var markerPoint = rotatePercentPoint(marker.xPct, marker.yPct, degrees);
+          marker.xPct = markerPoint.xPct;
+          marker.yPct = markerPoint.yPct;
+        });
+        lvl.lines.forEach(function(line) {
+          var start = rotatePercentPoint(line.x1Pct, line.y1Pct, degrees);
+          var end = rotatePercentPoint(line.x2Pct, line.y2Pct, degrees);
+          line.x1Pct = start.xPct;
+          line.y1Pct = start.yPct;
+          line.x2Pct = end.xPct;
+          line.y2Pct = end.yPct;
+          line.arc = -(line.arc || 0);
+        });
+
+        saveData();
+        renderCanvas();
+        renderSummary();
+        var image = document.getElementById('planImage');
+        image.onload = function() {
+          if (state.activeLevelId === lvl.id) fitSchematicFullSize();
+          image.onload = null;
+        };
+        image.src = lvl.imageData;
+        showToast(degrees === 90 ? 'Rotated schematic right' : 'Rotated schematic left', 'success');
+      };
+      source.onerror = function() { showToast('Unable to rotate this schematic', 'danger'); };
+      source.src = lvl.imageData;
     }
 
     function handleImageUpload(e, levelId) {
