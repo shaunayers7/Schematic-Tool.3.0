@@ -395,6 +395,14 @@
       } catch(e) { return fallback; }
     }
 
+    function loadClients() {
+      var clients = loadData('eb_clients_v51', null);
+      if (Array.isArray(clients) && clients.length > 0) return clients;
+
+      var recoveryClients = loadData('eb_clients_v51_recovery', []);
+      return Array.isArray(recoveryClients) ? recoveryClients : [];
+    }
+
     function escapeHtml(str) {
       return String(str == null ? '' : str).replace(/[&<>"']/g, function(ch) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
@@ -407,7 +415,7 @@
 
     var state = {
       activeClientId: null,
-      clients: loadData('eb_clients_v51', []),
+      clients: loadClients(),
       toolMode: 'marker',
       activeLevelId: 'lvl_main',
       activeDeviceId: 'dev_potlight',
@@ -595,7 +603,9 @@
     function saveData() {
       try {
         syncActiveClientToState();
-        localStorage.setItem('eb_clients_v51', JSON.stringify(state.clients));
+        var serializedClients = JSON.stringify(state.clients);
+        localStorage.removeItem('eb_clients_v51_recovery');
+        localStorage.setItem('eb_clients_v51', serializedClients);
         localStorage.setItem('eb_markersize_v51', JSON.stringify(state.markerSize));
         localStorage.setItem('eb_linethickness_v51', JSON.stringify(state.lineThickness));
         localStorage.setItem('eb_linestyle_v51', JSON.stringify(state.lineStyle));
