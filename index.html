@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Electric Boyes - Takeoff & Client Manager v5.1</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Schematic Tool v5.1">
+  <meta name="theme-color" content="#020617">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <title>Schematic Tool v5.1 - Takeoff & Client Manager</title>
   <style>
     :root {
       --marker-size: 28px;
@@ -139,7 +144,7 @@
 
   <header>
     <div class="brand">
-      <span>⚡</span> Electric Boyes v5.1
+      <span>⚡</span> Schematic Tool v5.1
     </div>
 
     <div class="client-bar">
@@ -732,7 +737,7 @@
       syncActiveClientToState();
       var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.clients, null, 2));
       var downloadAnchor = document.createElement('a');
-      var filename = 'electric_boyes_full_backup_' + new Date().toISOString().slice(0, 10) + '.ebbackup';
+      var filename = 'schematic_tool_v5_1_full_backup_' + new Date().toISOString().slice(0, 10) + '.ebbackup';
       downloadAnchor.setAttribute("href", dataStr);
       downloadAnchor.setAttribute("download", filename);
       document.body.appendChild(downloadAnchor);
@@ -773,7 +778,7 @@
         win.document.write('<html><head><title>Print Takeoff PDF</title>');
         win.document.write('<style>body{margin:0; padding:20px; text-align:center; background:#fff; font-family:sans-serif;} img{max-width:100%; height:auto; border:1px solid #ccc;}</style>');
         win.document.write('</head><body>');
-        win.document.write('<h2>Electric Boyes Takeoff: ' + getActiveLevel().name + '</h2>');
+        win.document.write('<h2>Schematic Tool v5.1 Takeoff: ' + getActiveLevel().name + '</h2>');
         win.document.write('<img src="' + imgData + '"/>');
         win.document.write('<script>setTimeout(function(){ window.print(); }, 500);<\/script>');
         win.document.write('</body></html>');
@@ -1324,16 +1329,26 @@
       }
     }
 
-    function removeExistingMarkerAtPoint(xPct, yPct) {
+    function removeExistingMarkerAtPoint(xPct, yPct, event) {
       var lvl = getActiveLevel();
       if (!lvl || !lvl.markers) return false;
 
-      var tolerance = Math.max(2.5, state.markerSize / 100 * 8);
-      var existing = lvl.markers.find(function(m) {
-        var dx = Math.abs(m.xPct - xPct);
-        var dy = Math.abs(m.yPct - yPct);
-        return Math.hypot(dx, dy) <= tolerance;
-      });
+      var markerTarget = event && event.target && event.target.closest ? event.target.closest('.marker') : null;
+      var existing = markerTarget && markerTarget.dataset.markerId ?
+        lvl.markers.find(function(m) { return m.id === markerTarget.dataset.markerId; }) : null;
+
+      var planContainer = document.getElementById('planContainer');
+      if (!planContainer) return false;
+      var planRect = planContainer.getBoundingClientRect();
+      var markerRadiusX = (state.markerSize / 2) / planRect.width * 100;
+      var markerRadiusY = (state.markerSize / 2) / planRect.height * 100;
+      if (!existing) {
+        existing = lvl.markers.find(function(m) {
+          var dx = (m.xPct - xPct) / markerRadiusX;
+          var dy = (m.yPct - yPct) / markerRadiusY;
+          return Math.hypot(dx, dy) <= 1;
+        });
+      }
 
       if (!existing) return false;
 
@@ -1347,12 +1362,13 @@
 
     function handleCanvasClick(event) {
       var lvl = getActiveLevel();
-      if (!lvl || !lvl.imageData || !state.activeDeviceId) return;
+      if (!lvl || !lvl.imageData) return;
 
       var point = getCanvasPointFromEvent(event);
       if (!point) return;
 
-      if (removeExistingMarkerAtPoint(point.xPct, point.yPct)) return;
+      if (removeExistingMarkerAtPoint(point.xPct, point.yPct, event)) return;
+      if (!state.activeDeviceId) return;
 
       pushUndo();
       lvl.markers.push({
@@ -1746,6 +1762,7 @@
           markerEl.style.left = m.xPct + '%';
           markerEl.style.top = m.yPct + '%';
           markerEl.style.backgroundColor = dev.color;
+          markerEl.dataset.markerId = m.id;
           markerEl.innerText = '';
           markerEl.title = dev.name + ' (Click to remove)';
 
