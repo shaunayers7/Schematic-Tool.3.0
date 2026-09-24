@@ -1,0 +1,1826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Schematic Tool v5.1">
+  <meta name="theme-color" content="#020617">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <title>Schematic Tool v5.1 - Takeoff & Client Manager</title>
+  <style>
+    :root {
+      --marker-size: 28px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    html, body { height: 100dvh; width: 100vw; overflow: hidden; background-color: #020617; color: #f8fafc; }
+    
+    body { display: flex; flex-direction: column; }
+    
+    header { background: #0f172a; border-bottom: 1px solid #1e293b; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; z-index: 500; flex-shrink: 0; }
+    .brand { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 16px; color: #10b981; }
+    
+    .client-bar { display: flex; align-items: center; gap: 8px; background: #1e293b; border: 1px solid #334155; padding: 4px 8px; border-radius: 6px; }
+    .client-select { background: #020617; color: #34d399; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; outline: none; max-width: 140px; }
+
+    .level-tabs { display: flex; gap: 6px; align-items: center; overflow-x: auto; max-width: 100%; padding-bottom: 2px; }
+    .tab-btn { background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .tab-btn.active { background: #10b981; color: #020617; border-color: #10b981; }
+    .add-tab-btn { background: #334155; color: #f8fafc; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    
+    /* Responsive Shell */
+    .app-body { display: flex; flex: 1; overflow: hidden; height: calc(100dvh - 54px); }
+    
+    @media (max-width: 768px) {
+      .app-body { flex-direction: column-reverse; }
+      .sidebar { width: 100% !important; height: 45dvh !important; }
+      .workspace { height: 55dvh !important; }
+    }
+
+    .sidebar { width: 360px; background: #0f172a; border-right: 1px solid #1e293b; display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar-content { padding: 12px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex: 1; }
+    .section-title { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 6px; }
+    
+    /* Device Cards */
+    .device-card { background: #1e293b; border: 2px solid transparent; border-radius: 8px; padding: 8px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; transition: all 0.15s ease; user-select: none; }
+    .device-card:hover { border-color: #334155; }
+    .device-card.selected { border-color: #10b981; background: #091322; box-shadow: 0 0 10px rgba(16, 185, 129, 0.2); }
+    .device-card.drag-over { border-color: #34d399; box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.4); }
+    .device-card.dragging { opacity: 0.4; }
+    .drag-handle { cursor: grab; color: #475569; font-size: 14px; padding: 0 2px; flex-shrink: 0; touch-action: none; }
+    .drag-handle:active { cursor: grabbing; }
+    
+    .active-badge { display: none; background: #10b981; color: #020617; font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 4px; text-transform: uppercase; }
+    .device-card.selected .active-badge { display: inline-block; }
+
+    .device-header { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
+    .device-info { display: flex; align-items: center; gap: 8px; flex: 1; }
+    
+    .symbol-badge { width: 32px; height: 32px; border-radius: 6px; background: #020617; border: 1px solid #334155; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; flex-shrink: 0; cursor: pointer; color: #ffffff; }
+    .device-name { font-size: 13px; font-weight: 700; color: #f8fafc; }
+    .price-input { width: 55px; background: #020617; border: 1px solid #334155; color: #34d399; font-weight: bold; border-radius: 4px; padding: 3px 5px; text-align: right; font-size: 12px; }
+
+    .color-dot-btn { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; cursor: pointer; flex-shrink: 0; }
+
+    .collapsible-box { background: #020617; padding: 8px; border-radius: 6px; border: 1px solid #334155; margin-top: 2px; display: flex; flex-direction: column; gap: 6px; }
+    .radial-dial-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .radial-dial { width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.2); cursor: pointer; position: relative; }
+    .radial-dial.active { border-color: #ffffff; box-shadow: 0 0 0 2px #10b981; transform: scale(1.1); }
+
+    .icon-picker-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; max-height: 120px; overflow-y: auto; padding: 2px; }
+    .icon-option { background: #1e293b; border: 1px solid #334155; border-radius: 4px; padding: 4px 2px; font-size: 11px; font-weight: bold; text-align: center; cursor: pointer; }
+    .icon-option:hover, .icon-option.active { border-color: #10b981; background: #10b981; color: #000; }
+
+    .mode-switch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .mode-btn { background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 7px; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .mode-btn.active { background: #10b981; color: #020617; border-color: #10b981; }
+
+    .btn { background: #10b981; color: #020617; font-weight: bold; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-hd { background: #3b82f6; color: #ffffff; }
+    .btn-hd.active { background: #10b981; color: #020617; }
+    .btn-secondary { background: #334155; color: #f8fafc; }
+    .btn-danger { background: #ef4444; color: #ffffff; }
+
+    /* Workspace & Canvas */
+    .workspace { flex: 1; background: #020617; position: relative; overflow: hidden; user-select: none; touch-action: none; }
+    .plan-container { position: absolute; top: 0; left: 0; transform-origin: 0 0; border: 1px dashed #334155; border-radius: 8px; background: #090d16; user-select: none; }
+    .plan-image { display: block; height: auto; user-select: none; border-radius: 8px; pointer-events: none; }
+    
+    .plan-image.hd-enhance {
+      image-rendering: auto;
+      filter: contrast(160%) brightness(110%) saturate(130%) grayscale(12%);
+      transform: scale(1.02);
+      transform-origin: center center;
+    }
+
+    /* Markers */
+    .marker { position: absolute; width: var(--marker-size, 28px); height: var(--marker-size, 28px); border-radius: 50%; transform: translate(-50%, -50%); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 6px rgba(0,0,0,0.6); border: none; pointer-events: auto; z-index: 50; transition: transform 0.1s ease; }
+    .marker:hover { transform: translate(-50%, -50%) scale(1.3); z-index: 100; }
+
+    /* Non-Zoomable Center Upload Box */
+    .upload-overlay-fixed { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 250; pointer-events: auto; background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(4px); padding: 16px; }
+    .upload-box-card { background: #0f172a; border: 2px dashed #38bdf8; border-radius: 12px; padding: 28px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; max-width: 420px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7); }
+
+    /* Sticky Footer Totals Card */
+    .summary-card { background: #0f172a; border-top: 2px solid #1e293b; padding: 10px 12px; flex-shrink: 0; }
+    .summary-row { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; border-bottom: 1px solid #1e293b; }
+    .summary-row:last-child { border-bottom: none; }
+    .total-price { color: #34d399; font-weight: bold; font-size: 14px; margin-top: 4px; }
+
+    .new-dev-form { display: flex; flex-direction: column; gap: 6px; background: #1e293b; padding: 8px; border-radius: 8px; }
+    .new-dev-form.collapsed .advanced-device-tools { display: none; }
+    .advanced-device-tools { display: block; }
+    .input-text { background: #020617; border: 1px solid #334155; color: #fff; padding: 6px 8px; border-radius: 4px; font-size: 12px; width: 100%; }
+
+    .scan-settings { background: #1e293b; padding: 8px 10px; border-radius: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .slider-container { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #94a3b8; }
+    .slider { width: 100%; accent-color: #10b981; }
+
+    /* Zoom Menu */
+    .zoom-controls { position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, 0.90); backdrop-filter: blur(8px); border: 1px solid #334155; padding: 4px 6px; border-radius: 8px; display: flex; align-items: center; gap: 4px; z-index: 300; }
+    .pan-hint { position: absolute; top: 10px; right: 10px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); border: 1px solid #334155; padding: 4px 8px; border-radius: 20px; font-size: 10px; color: #94a3b8; pointer-events: none; z-index: 300; }
+
+    /* Notifications & Modals */
+    .toast-container { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    .toast { pointer-events: auto; background: #0f172a; border: 1px solid #334155; color: #f8fafc; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6); display: flex; align-items: center; gap: 8px; border-left: 4px solid #10b981; max-width: 300px; }
+    .toast.toast-warning { border-left-color: #f59e0b; }
+    .toast.toast-danger { border-left-color: #ef4444; }
+    .toast.toast-info { border-left-color: #0284c7; }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(4px); z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .modal-card { background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 16px; width: 100%; max-width: 420px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; gap: 12px; }
+    .modal-title { font-size: 15px; font-weight: bold; color: #f8fafc; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+    .client-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+    .client-item { background: #1e293b; border: 1px solid #334155; padding: 8px 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .client-item.active { border-color: #10b981; background: #091322; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span>⚡</span> Schematic Tool v5.1
+    </div>
+
+    <div class="client-bar">
+      <span style="font-size: 10px; color: #94a3b8; font-weight: bold;">CLIENT:</span>
+      <select id="clientSelect" class="client-select" onchange="switchClient(this.value)"></select>
+      <button class="btn" style="padding: 2px 6px; font-size: 10px;" onclick="openClientManager()">🏢 Directory</button>
+    </div>
+    
+    <div class="level-tabs" id="levelTabs"></div>
+    
+    <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">
+      <button class="btn btn-secondary" id="undoBtn" onclick="undo()" disabled title="Undo">↩️</button>
+      <button class="btn btn-secondary" id="redoBtn" onclick="redo()" disabled title="Redo">↪️</button>
+      
+      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportSummary()">📋 Summary</button>
+      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportJPG()">🖼️ JPG</button>
+      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportPDF()">📄 PDF</button>
+      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportProjectJSON()">💾 Save .ebproj</button>
+      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="exportAllClients()">⬇️ Backup All</button>
+      <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="document.getElementById('importFile').click()">📂 Open</button>
+      <input type="file" id="importFile" accept=".json,.ebproj,.ebbackup" style="display:none;" onchange="importProjectJSON(event)">
+
+      <button class="btn btn-danger" style="padding: 4px 7px; font-size: 11px;" onclick="confirmClearActiveLevel()" title="Clear Level Content">🗑️ Clear</button>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <aside class="sidebar">
+      <div class="sidebar-content">
+        <div>
+          <div class="section-title">Takeoff Mode</div>
+          <div class="mode-switch-grid">
+            <button class="mode-btn active" id="modeMarkerBtn" onclick="setToolMode('marker')">📍 Devices</button>
+            <button class="mode-btn" id="modeLineBtn" onclick="setToolMode('line')">✏️ Circuit Lines</button>
+          </div>
+        </div>
+
+        <!-- Circuit Wiring & Arc Controls -->
+        <div id="lineColorSection" class="scan-settings" style="display: none;">
+          <div class="section-title" style="margin-bottom: 0;">Circuit Line Settings</div>
+          <div style="font-size: 10px; color: #94a3b8;">Wire Color:</div>
+          <div class="radial-dial-row" id="lineColorGrid"></div>
+
+          <div class="slider-container">
+            <div style="display: flex; justify-content: space-between;">
+              <span>Thickness:</span>
+              <b id="lineThicknessVal" style="color: #34d399;">4px</b>
+            </div>
+            <input type="range" id="lineThicknessSlider" class="slider" min="1" max="16" value="4" oninput="updateLineThickness(this.value)">
+          </div>
+
+          <div>
+            <div style="font-size: 10px; color: #94a3b8; font-weight: 600; margin-bottom: 4px;">Pattern:</div>
+            <div class="mode-switch-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+              <button class="mode-btn active" id="styleDottedBtn" onclick="setLineStyle('dotted')">••• Dotted</button>
+              <button class="mode-btn" id="styleDashedBtn" onclick="setLineStyle('dashed')">--- Dashed</button>
+              <button class="mode-btn" id="styleSolidBtn" onclick="setLineStyle('solid')">—— Solid</button>
+            </div>
+          </div>
+
+          <div style="border-top: 1px dashed #334155; padding-top: 6px;">
+            <div class="slider-container">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Arc Curvature:</span>
+                <b id="lineArcVal" style="color: #34d399;">0 (Straight)</b>
+              </div>
+              <input type="range" id="lineArcSlider" class="slider" min="-80" max="80" value="0" oninput="updateLineArc(this.value, true)">
+            </div>
+
+            <div class="mode-switch-grid" style="grid-template-columns: 1fr 1fr; margin-top: 6px;">
+              <button class="mode-btn" onclick="flipArcDirection()">🔄 Flip Arc</button>
+              <button class="mode-btn" onclick="resetArcStraight()">📏 Straight</button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">Devices & Symbols</div>
+          <div id="devicePalette" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+
+        <div>
+          <div class="section-title">Add Custom Symbol</div>
+          <div class="new-dev-form collapsed" id="customDeviceForm">
+            <input type="text" id="newDevName" placeholder="Name (e.g. 4-Way Switch)" class="input-text" oninput="toggleCustomDeviceForm(this.value)">
+            
+            <div class="advanced-device-tools">
+              <div style="font-size: 10px; color: #94a3b8; font-weight: 600;">Symbol Icon:</div>
+              <div class="icon-picker-grid" id="newDevIconGrid"></div>
+
+              <div style="font-size: 10px; color: #94a3b8; font-weight: 600; margin-top: 2px;">Dot Color:</div>
+              <div class="radial-dial-row" id="newDevRadialGrid"></div>
+
+              <input type="number" id="newDevPrice" placeholder="Unit Price ($)" value="50" class="input-text" style="margin-top: 2px;">
+              <button class="btn" onclick="addCustomDevice()">+ Add Device Type</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="scan-settings">
+          <div class="section-title" style="margin-bottom: 0;">Display Settings</div>
+          <button class="btn btn-hd" id="hdBtn" onclick="toggleHDEnhance()">✨ HD Lines: OFF</button>
+
+          <div class="slider-container">
+            <div style="display: flex; justify-content: space-between;">
+              <span>Dot Size:</span>
+              <b id="markerSizeVal" style="color: #34d399;">28px</b>
+            </div>
+            <input type="range" id="markerSizeSlider" class="slider" min="5" max="60" value="28" oninput="updateMarkerSize(this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Always Visible Footer Summary -->
+      <div class="summary-card">
+        <div class="section-title" style="margin-bottom: 2px;">Job Estimate Summary</div>
+        <div id="summaryRows"></div>
+        <div class="summary-row total-price">
+          <span>ESTIMATE TOTAL:</span>
+          <span id="grandTotal">$0.00</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="workspace" id="workspace">
+      <!-- Fixed, Centered Non-Zoomable Upload Overlay -->
+      <div id="uploadOverlay" class="upload-overlay-fixed" style="display: none;">
+        <div class="upload-box-card">
+          <p style="font-size: 17px; font-weight: bold; color: #f8fafc;">No Schematic Loaded</p>
+          <p style="font-size: 12px; color: #94a3b8;">Select a floor plan image (PNG, JPG, WEBP) for <b id="targetLevelNameText" style="color:#34d399;">Active Floor</b></p>
+          <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
+          <button class="btn" style="padding: 10px 18px; font-size: 13px;" onclick="document.getElementById('fileInput').click()">📁 Load Floor Schematic</button>
+        </div>
+      </div>
+
+      <div class="zoom-controls">
+        <button class="btn btn-secondary" style="padding: 2px 6px;" onclick="zoomOut()">-</button>
+        <span id="zoomVal" style="font-size: 11px; font-weight: bold; color: #34d399; min-width: 36px; text-align: center;">100%</span>
+        <button class="btn btn-secondary" style="padding: 2px 6px;" onclick="zoomIn()">+</button>
+        <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 10px;" onclick="fitSchematicFullSize()">🔍 Fit</button>
+        <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 10px;" onclick="document.getElementById('fileInput').click()">📁 Load Plan</button>
+      </div>
+
+      <div class="pan-hint">💡 Drag to Pan • Click dots/lines to delete</div>
+
+      <div class="plan-container" id="planContainer">
+        <img id="planImage" class="plan-image" style="display:none;" />
+        <svg id="svgOverlay" viewBox="0 0 100 100" preserveAspectRatio="none" style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 40;"></svg>
+        <div id="markerOverlay"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Client Directory Modal -->
+  <div id="clientModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-title">Client Directory</div>
+      <div class="client-list" id="clientListContainer"></div>
+      
+      <div style="border-top: 1px solid #334155; padding-top: 10px; display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 11px; font-weight: bold; color: #94a3b8;">+ Add New Client Job File</div>
+        <input type="text" id="newClientName" placeholder="Client Name (e.g. Miller Residence)" class="input-text">
+        <input type="text" id="newClientAddress" placeholder="Site Address / Job Notes" class="input-text">
+        <button class="btn" onclick="addNewClient()">Create Client File</button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeClientManager()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div id="confirmModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-title" id="confirmTitle">Confirm Action</div>
+      <div style="font-size: 13px; color: #94a3b8;" id="confirmText">Are you sure?</div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
+        <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var PRESET_COLORS = [
+      { id: 'yellow',  rgba: 'rgba(234, 179, 8, 0.85)', solid: '#eab308' },
+      { id: 'emerald', rgba: 'rgba(16, 185, 129, 0.85)', solid: '#10b981' },
+      { id: 'blue',    rgba: 'rgba(59, 130, 246, 0.85)', solid: '#3b82f6' },
+      { id: 'purple',  rgba: 'rgba(168, 85, 247, 0.85)', solid: '#a855f7' },
+      { id: 'pink',    rgba: 'rgba(236, 72, 153, 0.85)', solid: '#ec4899' },
+      { id: 'orange',  rgba: 'rgba(249, 115, 22, 0.85)', solid: '#f97316' },
+      { id: 'cyan',    rgba: 'rgba(6, 182, 212, 0.85)',  solid: '#06b6d4' },
+      { id: 'lime',    rgba: 'rgba(132, 204, 22, 0.85)', solid: '#84cc16' },
+      { id: 'crimson', rgba: 'rgba(239, 68, 68, 0.85)',  solid: '#ef4444' },
+      { id: 'indigo',  rgba: 'rgba(99, 102, 241, 0.85)', solid: '#6366f1' }
+    ];
+
+    var PRESET_ICONS = [
+      '💡', '🔌', '🔀', '⚡', '🚨', '🌀', '🛜', '🔔', '☀️', '🔋', '📍', '🚪',
+      '🎛️', '🔘', '🛋️', '⚙️', '🪟', '♨️', '📻', '📺', '🪛', '📶', '🎚️', '🔆',
+      'R', 'S', 'S3', 'S4', 'Sdim', 'K', 'T', 'GFI', 'WP'
+    ];
+
+    var DEFAULT_DEVICES = [
+      { id: 'dev_potlight', name: 'Potlight / Fixture', price: 65.00, color: PRESET_COLORS[0].rgba, icon: '💡' },
+      { id: 'dev_plug', name: 'Duplex Plug / Outlet', price: 50.00, color: PRESET_COLORS[1].rgba, icon: '🔌' },
+      { id: 'dev_switch', name: 'Single Pole Switch (S)', price: 45.00, color: PRESET_COLORS[2].rgba, icon: 'S' },
+      { id: 'dev_3way', name: '3-Way Switch (S3)', price: 55.00, color: PRESET_COLORS[3].rgba, icon: 'S3' },
+      { id: 'dev_4way', name: '4-Way Switch (S4)', price: 65.00, color: PRESET_COLORS[4].rgba, icon: 'S4' },
+      { id: 'dev_dimmer', name: 'Dimmer Switch (Sdim)', price: 70.00, color: PRESET_COLORS[5].rgba, icon: 'Sdim' }
+    ];
+
+    function loadData(key, fallback) {
+      try {
+        var d = localStorage.getItem(key);
+        return d ? JSON.parse(d) : fallback;
+      } catch(e) { return fallback; }
+    }
+
+    function escapeHtml(str) {
+      return String(str == null ? '' : str).replace(/[&<>"']/g, function(ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
+
+    var selectedNewDevColor = PRESET_COLORS[0].rgba;
+    var selectedNewDevIcon = PRESET_ICONS[0];
+    var activeLineColor = PRESET_COLORS[0].solid;
+
+    var state = {
+      activeClientId: null,
+      clients: loadData('eb_clients_v51', []),
+      toolMode: 'marker',
+      activeLevelId: 'lvl_main',
+      activeDeviceId: 'dev_potlight',
+      selectedLineId: null,
+      openColorPickerDevId: null,
+      openIconPickerDevId: null,
+      markerSize: loadData('eb_markersize_v51', 28),
+      lineThickness: loadData('eb_linethickness_v51', 4),
+      lineStyle: loadData('eb_linestyle_v51', 'dotted'),
+      lineArc: loadData('eb_linearc_v51', 0),
+      isHDEnhance: false,
+      isDrawingLine: false,
+      lineStart: { xPct: 0, yPct: 0 },
+      devices: DEFAULT_DEVICES,
+      levels: [
+        { id: 'lvl_main', name: 'Main Floor', imageData: null, markers: [], lines: [] },
+        { id: 'lvl_upper', name: 'Upper Floor', imageData: null, markers: [], lines: [] },
+        { id: 'lvl_basement', name: 'Basement', imageData: null, markers: [], lines: [] }
+      ]
+    };
+
+    if (!state.clients || state.clients.length === 0) {
+      state.clients = [{
+        id: 'client_default',
+        name: 'Sample Job File',
+        address: '123 Site St',
+        devices: JSON.parse(JSON.stringify(DEFAULT_DEVICES)),
+        levels: JSON.parse(JSON.stringify(state.levels))
+      }];
+      state.activeClientId = 'client_default';
+    } else {
+      state.activeClientId = state.clients[0].id;
+    }
+
+    function syncActiveClientFromState() {
+      var client = state.clients.find(function(c) { return c.id === state.activeClientId; });
+      if (client) {
+        state.devices = client.devices || DEFAULT_DEVICES;
+        state.levels = client.levels || [];
+      }
+    }
+
+    function syncActiveClientToState() {
+      var client = state.clients.find(function(c) { return c.id === state.activeClientId; });
+      if (client) {
+        client.devices = state.devices;
+        client.levels = state.levels;
+      }
+    }
+
+    syncActiveClientFromState();
+
+    var floorHistory = {};
+
+    function getFloorHistory(levelId) {
+      if (!levelId) levelId = state.activeLevelId;
+      var key = state.activeClientId + '::' + levelId;
+      if (!floorHistory[key]) floorHistory[key] = { undo: [], redo: [] };
+      return floorHistory[key];
+    }
+
+    function cloneLevel(level) {
+      return JSON.parse(JSON.stringify(level || { id: state.activeLevelId, name: '', imageData: null, markers: [], lines: [] }));
+    }
+
+    function pushUndo() {
+      syncActiveClientToState();
+      var lvl = getActiveLevel();
+      if (!lvl) return;
+
+      var hist = getFloorHistory(lvl.id);
+      var snapshot = getCurrentLevelSnapshot(lvl.id);
+      if (!snapshot) return;
+      hist.undo.push(JSON.stringify(snapshot));
+      if (hist.undo.length > 18) hist.undo.shift();
+      hist.redo = [];
+      updateUndoRedoButtons();
+    }
+
+    function undo() {
+      var lvl = getActiveLevel();
+      if (!lvl) return;
+
+      var hist = getFloorHistory(lvl.id);
+      if (hist.undo.length === 0) return;
+
+      var currentSnapshot = getCurrentLevelSnapshot(lvl.id);
+      hist.redo.push(JSON.stringify(currentSnapshot));
+      var prevLevel = JSON.parse(hist.undo.pop());
+      restoreLevelSnapshot(lvl.id, prevLevel);
+
+      saveData();
+      renderAll();
+      showToast('Undo performed on ' + lvl.name, 'info');
+    }
+
+    function redo() {
+      var lvl = getActiveLevel();
+      if (!lvl) return;
+
+      var hist = getFloorHistory(lvl.id);
+      if (hist.redo.length === 0) return;
+
+      var currentSnapshot = getCurrentLevelSnapshot(lvl.id);
+      hist.undo.push(JSON.stringify(currentSnapshot));
+      var nextLevel = JSON.parse(hist.redo.pop());
+      restoreLevelSnapshot(lvl.id, nextLevel);
+
+      saveData();
+      renderAll();
+      showToast('Redo performed on ' + lvl.name, 'info');
+    }
+
+    function updateUndoRedoButtons() {
+      var lvl = getActiveLevel();
+      var hist = getFloorHistory(lvl ? lvl.id : state.activeLevelId);
+      document.getElementById('undoBtn').disabled = (hist.undo.length === 0);
+      document.getElementById('redoBtn').disabled = (hist.redo.length === 0);
+    }
+
+    function getCurrentLevelSnapshot(levelId) {
+      var found = state.levels.find(function(level) { return level.id === levelId; });
+      if (!found) return null;
+      return JSON.parse(JSON.stringify({
+        id: found.id,
+        name: found.name,
+        imageData: found.imageData,
+        markers: found.markers || [],
+        lines: found.lines || []
+      }));
+    }
+
+    function restoreLevelSnapshot(levelId, snapshot) {
+      if (!snapshot) return;
+      var idx = state.levels.findIndex(function(level) { return level.id === levelId; });
+      if (idx < 0) return;
+      state.levels[idx] = Object.assign({}, snapshot, {
+        id: levelId,
+        markers: snapshot.markers || [],
+        lines: snapshot.lines || [],
+        imageData: snapshot.imageData || null
+      });
+    }
+
+    var zoomScale = 1;
+    var panX = 20;
+    var panY = 20;
+    var isPanning = false;
+
+    function showToast(message, type) {
+      type = type || 'success';
+      var container = document.getElementById('toastContainer');
+      var toast = document.createElement('div');
+      toast.className = 'toast toast-' + type;
+      var icon = type === 'success' ? '✅' : type === 'warning' ? '⚠️' : type === 'danger' ? '🚨' : 'ℹ️';
+      toast.innerHTML = '<span>' + icon + '</span><span>' + escapeHtml(message) + '</span>';
+      container.appendChild(toast);
+
+      setTimeout(function() {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 3000);
+    }
+
+    function showConfirm(title, message, onConfirm) {
+      var modal = document.getElementById('confirmModal');
+      document.getElementById('confirmTitle').innerText = title;
+      document.getElementById('confirmText').innerText = message;
+      modal.style.display = 'flex';
+
+      var okBtn = document.getElementById('confirmOkBtn');
+      var cancelBtn = document.getElementById('confirmCancelBtn');
+
+      var cleanup = function() {
+        modal.style.display = 'none';
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+      };
+
+      okBtn.onclick = function() { cleanup(); onConfirm(); };
+      cancelBtn.onclick = function() { cleanup(); };
+    }
+
+    function saveData() {
+      try {
+        syncActiveClientToState();
+        localStorage.setItem('eb_clients_v51', JSON.stringify(state.clients));
+        localStorage.setItem('eb_markersize_v51', JSON.stringify(state.markerSize));
+        localStorage.setItem('eb_linethickness_v51', JSON.stringify(state.lineThickness));
+        localStorage.setItem('eb_linestyle_v51', JSON.stringify(state.lineStyle));
+        localStorage.setItem('eb_linearc_v51', JSON.stringify(state.lineArc));
+      } catch(e) {
+        console.error('saveData failed', e);
+        showToast('Auto-save failed (storage full?). Export a backup now!', 'danger');
+      }
+    }
+
+    /* Client Directory */
+    function renderClientSelect() {
+      var sel = document.getElementById('clientSelect');
+      var html = '';
+      state.clients.forEach(function(c) {
+        var selAttr = c.id === state.activeClientId ? 'selected' : '';
+        html += '<option value="' + c.id + '" ' + selAttr + '>' + escapeHtml(c.name) + '</option>';
+      });
+      sel.innerHTML = html;
+    }
+
+    function switchClient(clientId) {
+      pushUndo();
+      syncActiveClientToState();
+      state.activeClientId = clientId;
+      syncActiveClientFromState();
+
+      if (state.levels.length > 0) {
+        state.activeLevelId = state.levels[0].id;
+      }
+      saveData();
+      renderAll();
+      showToast('Switched client job file', 'info');
+    }
+
+    function openClientManager() {
+      renderClientList();
+      document.getElementById('clientModal').style.display = 'flex';
+    }
+
+    function closeClientManager() {
+      document.getElementById('clientModal').style.display = 'none';
+    }
+
+    function renderClientList() {
+      var container = document.getElementById('clientListContainer');
+      var html = '';
+      state.clients.forEach(function(c) {
+        var isActive = c.id === state.activeClientId;
+        html += '<div class="client-item ' + (isActive ? 'active' : '') + '">';
+        html += '  <div style="flex:1;" onclick="switchClient(\'' + c.id + '\'); closeClientManager();">';
+        html += '    <div style="font-weight:bold; font-size:13px; color:#f8fafc;">' + escapeHtml(c.name) + '</div>';
+        html += '    <div style="font-size:11px; color:#94a3b8;">' + escapeHtml(c.address || 'No address set') + '</div>';
+        html += '  </div>';
+        if (state.clients.length > 1) {
+          html += '  <button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" onclick="deleteClient(\'' + c.id + '\')">Delete</button>';
+        }
+        html += '</div>';
+      });
+      container.innerHTML = html;
+    }
+
+    function addNewClient() {
+      var name = document.getElementById('newClientName').value.trim();
+      var address = document.getElementById('newClientAddress').value.trim();
+
+      if (!name) {
+        showToast('Enter client name', 'warning');
+        return;
+      }
+
+      pushUndo();
+      var newC = {
+        id: 'client_' + Date.now(),
+        name: name,
+        address: address,
+        devices: JSON.parse(JSON.stringify(DEFAULT_DEVICES)),
+        levels: [
+          { id: 'lvl_main', name: 'Main Floor', imageData: null, markers: [], lines: [] },
+          { id: 'lvl_upper', name: 'Upper Floor', imageData: null, markers: [], lines: [] },
+          { id: 'lvl_basement', name: 'Basement', imageData: null, markers: [], lines: [] }
+        ]
+      };
+
+      state.clients.push(newC);
+      state.activeClientId = newC.id;
+      syncActiveClientFromState();
+
+      document.getElementById('newClientName').value = '';
+      document.getElementById('newClientAddress').value = '';
+      closeClientManager();
+      saveData();
+      renderAll();
+      showToast('Created client file', 'success');
+    }
+
+    function deleteClient(clientId) {
+      showConfirm('Delete Client', 'Are you sure you want to delete this entire client file?', function() {
+        pushUndo();
+        state.clients = state.clients.filter(function(c) { return c.id !== clientId; });
+        if (state.activeClientId === clientId) {
+          state.activeClientId = state.clients[0].id;
+          syncActiveClientFromState();
+        }
+        saveData();
+        renderAll();
+        renderClientList();
+        showToast('Client file deleted', 'danger');
+      });
+    }
+
+    /* Import & Export Tools */
+    function exportProjectJSON() {
+      syncActiveClientToState();
+      var client = state.clients.find(function(c) { return c.id === state.activeClientId; });
+      var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(client, null, 2));
+      var downloadAnchor = document.createElement('a');
+      var filename = (client.name || 'takeoff_project').replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.ebproj';
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", filename);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('Project saved as ' + filename, 'success');
+    }
+
+    function importProjectJSON(event) {
+      var file = event.target.files[0];
+      if (!file) return;
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var parsed = JSON.parse(e.target.result);
+
+          if (Array.isArray(parsed)) {
+            importAllClients(parsed);
+            return;
+          }
+
+          if (!parsed || !parsed.id || !Array.isArray(parsed.levels)) {
+            showToast('Invalid project file format', 'danger');
+            return;
+          }
+
+          pushUndo();
+          parsed.id = 'client_' + Date.now();
+          parsed.devices = Array.isArray(parsed.devices) ? parsed.devices : JSON.parse(JSON.stringify(DEFAULT_DEVICES));
+          parsed.levels.forEach(function(lvl) {
+            lvl.markers = Array.isArray(lvl.markers) ? lvl.markers : [];
+            lvl.lines = Array.isArray(lvl.lines) ? lvl.lines : [];
+          });
+          state.clients.push(parsed);
+          state.activeClientId = parsed.id;
+          syncActiveClientFromState();
+
+          saveData();
+          renderAll();
+          showToast('Imported project file', 'success');
+        } catch(err) {
+          showToast('Failed to parse project file', 'danger');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function exportAllClients() {
+      syncActiveClientToState();
+      var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.clients, null, 2));
+      var downloadAnchor = document.createElement('a');
+      var filename = 'schematic_tool_v5_1_full_backup_' + new Date().toISOString().slice(0, 10) + '.ebbackup';
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", filename);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('Full backup saved as ' + filename, 'success');
+    }
+
+    function importAllClients(clientsArray) {
+      if (!clientsArray.length) {
+        showToast('Backup file has no client data', 'danger');
+        return;
+      }
+      showConfirm('Restore Full Backup', 'This replaces ALL current clients (' + state.clients.length + ') with ' + clientsArray.length + ' from the backup file. Continue?', function() {
+        state.clients = clientsArray;
+        state.activeClientId = clientsArray[0].id;
+        syncActiveClientFromState();
+        saveData();
+        renderAll();
+        showToast('Full backup restored', 'success');
+      });
+    }
+
+    function exportJPG() {
+      renderCompositeCanvas(function(canvas) {
+        var link = document.createElement('a');
+        link.download = (getActiveLevel().name || 'schematic') + '_takeoff.jpg';
+        link.href = canvas.toDataURL('image/jpeg', 0.92);
+        link.click();
+        showToast('Exported JPG image', 'success');
+      });
+    }
+
+    function exportPDF() {
+      renderCompositeCanvas(function(canvas) {
+        var imgData = canvas.toDataURL('image/jpeg', 0.9);
+        var win = window.open('', '_blank');
+        win.document.write('<html><head><title>Print Takeoff PDF</title>');
+        win.document.write('<style>body{margin:0; padding:20px; text-align:center; background:#fff; font-family:sans-serif;} img{max-width:100%; height:auto; border:1px solid #ccc;}</style>');
+        win.document.write('</head><body>');
+        win.document.write('<h2>Schematic Tool v5.1 Takeoff: ' + getActiveLevel().name + '</h2>');
+        win.document.write('<img src="' + imgData + '"/>');
+        win.document.write('<script>setTimeout(function(){ window.print(); }, 500);<\/script>');
+        win.document.write('</body></html>');
+        win.document.close();
+        showToast('Opened printable PDF window', 'info');
+      });
+    }
+
+    function renderCompositeCanvas(callback) {
+      var lvl = getActiveLevel();
+      var imgEl = document.getElementById('planImage');
+      if (!lvl || !lvl.imageData || !imgEl.naturalWidth) {
+        showToast('No schematic loaded for this floor', 'warning');
+        return;
+      }
+
+      var canvas = document.createElement('canvas');
+      var w = imgEl.naturalWidth;
+      var h = imgEl.naturalHeight;
+      canvas.width = w;
+      canvas.height = h;
+      var ctx = canvas.getContext('2d');
+
+      ctx.drawImage(imgEl, 0, 0, w, h);
+
+      if (lvl.lines) {
+        lvl.lines.forEach(function(l) {
+          var x1 = (l.x1Pct / 100) * w;
+          var y1 = (l.y1Pct / 100) * h;
+          var x2 = (l.x2Pct / 100) * w;
+          var y2 = (l.y2Pct / 100) * h;
+
+          ctx.beginPath();
+          ctx.strokeStyle = l.color;
+          ctx.lineWidth = l.thickness * (w / 1000);
+          ctx.lineCap = 'round';
+
+          if (l.style === 'dotted') ctx.setLineDash([2, 8]);
+          else if (l.style === 'dashed') ctx.setLineDash([12, 8]);
+          else ctx.setLineDash([]);
+
+          var a = l.arc || 0;
+          if (Math.abs(a) > 0.1) {
+            var mx = (x1 + x2) / 2;
+            var my = (y1 + y2) / 2;
+            var dx = x2 - x1;
+            var dy = y2 - y1;
+            var dist = Math.hypot(dx, dy);
+            var nx = -dy / dist;
+            var ny = dx / dist;
+            var curveScale = Math.min(1, dist / 35);
+            var cx = mx + nx * (a * curveScale);
+            var cy = my + ny * (a * curveScale);
+            ctx.moveTo(x1, y1);
+            ctx.quadraticCurveTo(cx, cy, x2, y2);
+          } else {
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+        });
+      }
+
+      if (lvl.markers) {
+        lvl.markers.forEach(function(m) {
+          var dev = state.devices.find(function(d) { return d.id === m.deviceId; });
+          if (!dev) return;
+
+          var cx = (m.xPct / 100) * w;
+          var cy = (m.yPct / 100) * h;
+          var radius = (state.markerSize / 2) * (w / 1000);
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
+          ctx.fillStyle = dev.color;
+          ctx.fill();
+        });
+      }
+
+      callback(canvas);
+    }
+
+    /* Floor Plan & Level Management */
+    function getActiveLevel() {
+      var lvl = state.levels.find(function(l) { return l.id === state.activeLevelId; });
+      if (!lvl && state.levels.length > 0) {
+        state.activeLevelId = state.levels[0].id;
+        lvl = state.levels[0];
+      }
+      if (lvl && !lvl.lines) lvl.lines = [];
+      if (lvl && !lvl.markers) lvl.markers = [];
+      return lvl;
+    }
+
+    function handleImageUpload(e, levelId) {
+      var file = e.target.files[0];
+      if (!file) return;
+
+      var targetLevel = levelId ? state.levels.find(function(lvl) { return lvl.id === levelId; }) : getActiveLevel();
+      if (!targetLevel) return;
+
+      var reader = new FileReader();
+      reader.onload = function(evt) {
+        pushUndo();
+        targetLevel.imageData = evt.target.result;
+        saveData();
+        renderCanvas();
+        renderSummary();
+        var img = document.getElementById('planImage');
+        if (img) {
+          img.onload = function() {
+            if (state.activeLevelId === targetLevel.id) fitSchematicFullSize();
+            img.onload = null;
+          };
+          img.src = targetLevel.imageData;
+        }
+        showToast('Loaded schematic for ' + targetLevel.name, 'success');
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    }
+
+    function switchLevel(lvlId) {
+      state.activeLevelId = lvlId;
+      state.selectedLineId = null;
+      renderAll();
+    }
+
+    function addNewLevel() {
+      var name = prompt('Level Name (e.g. Garage / Patio):');
+      if (!name) return;
+      pushUndo();
+      var newLvl = { id: 'lvl_' + Date.now(), name: name, imageData: null, markers: [], lines: [] };
+      state.levels.push(newLvl);
+      state.activeLevelId = newLvl.id;
+      saveData();
+      renderAll();
+    }
+
+    function confirmClearActiveLevel() {
+      var lvl = getActiveLevel();
+      if (!lvl || (lvl.markers.length === 0 && lvl.lines.length === 0)) return;
+
+      showConfirm('Clear Level Content', 'Delete all markers and circuit lines on ' + lvl.name + '?', function() {
+        pushUndo();
+        lvl.markers = [];
+        lvl.lines = [];
+        saveData();
+        renderAll();
+        showToast('Cleared level content', 'danger');
+      });
+    }
+
+    /* Controls & Drawing Modes */
+    function updateMarkerSize(val) {
+      state.markerSize = parseInt(val, 10) || 28;
+      document.documentElement.style.setProperty('--marker-size', state.markerSize + 'px');
+      document.getElementById('markerSizeVal').innerText = state.markerSize + 'px';
+      saveData();
+    }
+
+    function updateLineThickness(val, updateLastLine) {
+      state.lineThickness = parseInt(val, 10) || 4;
+      document.getElementById('lineThicknessVal').innerText = state.lineThickness + 'px';
+      document.getElementById('lineThicknessSlider').value = state.lineThickness;
+
+      if (updateLastLine !== false) {
+        var lvl = getActiveLevel();
+        if (lvl && lvl.lines && lvl.lines.length > 0) {
+          var targetLine = state.selectedLineId ?
+            lvl.lines.find(function(l) { return l.id === state.selectedLineId; }) :
+            lvl.lines[lvl.lines.length - 1];
+          if (targetLine) {
+            pushUndo();
+            targetLine.thickness = state.lineThickness;
+            saveData();
+            renderLines();
+          }
+        }
+      }
+      saveData();
+    }
+
+    function setLineStyle(style, updateLastLine) {
+      state.lineStyle = style;
+      document.getElementById('styleDottedBtn').classList.toggle('active', style === 'dotted');
+      document.getElementById('styleDashedBtn').classList.toggle('active', style === 'dashed');
+      document.getElementById('styleSolidBtn').classList.toggle('active', style === 'solid');
+
+      if (updateLastLine !== false) {
+        var lvl = getActiveLevel();
+        if (lvl && lvl.lines && lvl.lines.length > 0) {
+          var targetLine = state.selectedLineId ?
+            lvl.lines.find(function(l) { return l.id === state.selectedLineId; }) :
+            lvl.lines[lvl.lines.length - 1];
+          if (targetLine) {
+            pushUndo();
+            targetLine.style = state.lineStyle;
+            saveData();
+            renderLines();
+          }
+        }
+      }
+      saveData();
+    }
+
+    function updateLineArc(val, updateLastLine) {
+      state.lineArc = parseInt(val, 10) || 0;
+      var valEl = document.getElementById('lineArcVal');
+      if (valEl) {
+        if (state.lineArc === 0) valEl.innerText = '0 (Straight)';
+        else if (state.lineArc > 0) valEl.innerText = '+' + state.lineArc + ' (Arc Right)';
+        else valEl.innerText = state.lineArc + ' (Arc Left)';
+      }
+      var slider = document.getElementById('lineArcSlider');
+      if (slider) slider.value = state.lineArc;
+
+      if (updateLastLine) {
+        var lvl = getActiveLevel();
+        if (lvl && lvl.lines && lvl.lines.length > 0) {
+          var targetLine = state.selectedLineId ? 
+            lvl.lines.find(function(l) { return l.id === state.selectedLineId; }) : 
+            lvl.lines[lvl.lines.length - 1];
+          if (targetLine) {
+            pushUndo();
+            targetLine.arc = state.lineArc;
+            saveData();
+            renderLines();
+          }
+        }
+      }
+      saveData();
+    }
+
+    function flipArcDirection() {
+      var newArc = (state.lineArc === 0) ? 25 : -1 * state.lineArc;
+      updateLineArc(newArc, true);
+    }
+
+    function resetArcStraight() {
+      updateLineArc(0, true);
+    }
+
+    function getDashArray(style, thickness) {
+      if (style === 'dotted') return '0.1 ' + (thickness * 2.2);
+      if (style === 'dashed') return (thickness * 3) + ' ' + (thickness * 2);
+      return 'none';
+    }
+
+    function getArcPath(x1, y1, x2, y2, arc) {
+      var a = parseFloat(arc) || 0;
+      if (Math.abs(a) < 0.1) return 'M ' + x1 + ' ' + y1 + ' L ' + x2 + ' ' + y2;
+      var mx = (x1 + x2) / 2;
+      var my = (y1 + y2) / 2;
+      var dx = x2 - x1;
+      var dy = y2 - y1;
+      var dist = Math.hypot(dx, dy);
+      if (dist < 0.001) return 'M ' + x1 + ' ' + y1 + ' L ' + x2 + ' ' + y2;
+      var nx = -dy / dist;
+      var ny = dx / dist;
+      var curveScale = Math.min(1, dist / 35);
+      var cx = mx + nx * (a * curveScale);
+      var cy = my + ny * (a * curveScale);
+      return 'M ' + x1 + ' ' + y1 + ' Q ' + cx + ' ' + cy + ' ' + x2 + ' ' + y2;
+    }
+
+    function setToolMode(mode) {
+      state.toolMode = mode;
+      document.getElementById('modeMarkerBtn').classList.toggle('active', mode === 'marker');
+      document.getElementById('modeLineBtn').classList.toggle('active', mode === 'line');
+      document.getElementById('lineColorSection').style.display = (mode === 'line') ? 'flex' : 'none';
+      if (mode === 'line') state.activeDeviceId = null;
+      else if (mode === 'marker' && !state.activeDeviceId && state.devices.length > 0) {
+        state.activeDeviceId = state.devices[0].id;
+      }
+      renderDevicePalette();
+    }
+
+    function toggleHDEnhance() {
+      state.isHDEnhance = !state.isHDEnhance;
+      var btn = document.getElementById('hdBtn');
+      var img = document.getElementById('planImage');
+      btn.innerText = state.isHDEnhance ? '✨ HD Lines: ON' : '✨ HD Lines: OFF';
+      btn.classList.toggle('active', state.isHDEnhance);
+      if (img) img.classList.toggle('hd-enhance', state.isHDEnhance);
+      if (img) {
+        img.style.filter = state.isHDEnhance ? 'contrast(125%) brightness(108%) saturate(120%)' : '';
+        img.style.transform = state.isHDEnhance ? 'scale(1.01)' : '';
+      }
+      showToast(state.isHDEnhance ? 'HD image enhancement enabled' : 'HD image enhancement disabled', 'info');
+    }
+
+    function fitSchematicFullSize() {
+      var workspace = document.getElementById('workspace');
+      var img = document.getElementById('planImage');
+      if (!img || !img.naturalWidth || img.style.display === 'none') return;
+      var wsWidth = workspace.clientWidth - 30;
+      var wsHeight = workspace.clientHeight - 30;
+      var scaleX = wsWidth / img.naturalWidth;
+      var scaleY = wsHeight / img.naturalHeight;
+      zoomScale = Math.min(scaleX, scaleY);
+      if (zoomScale <= 0) zoomScale = 1;
+      panX = Math.max(15, (workspace.clientWidth - (img.naturalWidth * zoomScale)) / 2);
+      panY = Math.max(15, (workspace.clientHeight - (img.naturalHeight * zoomScale)) / 2);
+      updateTransform();
+    }
+
+    function updateTransform() {
+      var container = document.getElementById('planContainer');
+      if (container) container.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + zoomScale + ')';
+      document.getElementById('zoomVal').innerText = Math.round(zoomScale * 100) + '%';
+    }
+
+    function zoomIn() { applyZoom(1.25); }
+    function zoomOut() { applyZoom(1 / 1.25); }
+    function applyZoom(factor) {
+      var ws = document.getElementById('workspace');
+      var rect = ws.getBoundingClientRect();
+      var mx = rect.width / 2;
+      var my = rect.height / 2;
+      var newScale = Math.min(Math.max(0.1, zoomScale * factor), 10);
+      panX = mx - (mx - panX) * (newScale / zoomScale);
+      panY = my - (my - panY) * (newScale / zoomScale);
+      zoomScale = newScale;
+      updateTransform();
+    }
+
+    var workspaceEl = document.getElementById('workspace');
+    var pendingPan = null;
+    var pinchZoom = { active: false, startDistance: 0, startZoom: 1 };
+
+    function setZoomFromCenter(factor) {
+      var ws = document.getElementById('workspace');
+      var rect = ws.getBoundingClientRect();
+      var cx = rect.width / 2;
+      var cy = rect.height / 2;
+      var newScale = Math.min(Math.max(0.2, zoomScale * factor), 10);
+      panX = cx - (cx - panX) * (newScale / zoomScale);
+      panY = cy - (cy - panY) * (newScale / zoomScale);
+      zoomScale = newScale;
+      updateTransform();
+    }
+
+    workspaceEl.addEventListener('wheel', function(e) {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+        panX += e.deltaX * 1.1;
+        panY += e.deltaY * 0.15;
+        updateTransform();
+        return;
+      }
+
+      e.preventDefault();
+      var delta = e.deltaY < 0 ? 1.12 : 0.88;
+      setZoomFromCenter(delta);
+    }, { passive: false });
+
+    workspaceEl.addEventListener('mousedown', function(e) {
+      if (e.button === 1 || e.button === 2) {
+        pendingPan = { x: e.clientX, y: e.clientY, panX: panX, panY: panY, moved: false };
+        return;
+      }
+      if (e.button !== 0) return;
+      if (state.toolMode === 'line') {
+        handleMouseDown(e);
+        return;
+      }
+      pendingPan = { x: e.clientX, y: e.clientY, panX: panX, panY: panY, moved: false };
+    });
+
+    window.addEventListener('mousemove', function(e) {
+      if (state.toolMode === 'line') {
+        if (state.isDrawingLine) handleMouseMove(e);
+        return;
+      }
+      if (!pendingPan) return;
+      var dx = e.clientX - pendingPan.x;
+      var dy = e.clientY - pendingPan.y;
+      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+        pendingPan.moved = true;
+        panX = pendingPan.panX + dx;
+        panY = pendingPan.panY + dy;
+        updateTransform();
+      }
+    });
+
+    window.addEventListener('mouseup', function(e) {
+      if (state.toolMode === 'line') {
+        handleMouseUp(e);
+        return;
+      }
+      if (!pendingPan) return;
+      if (!pendingPan.moved) {
+        handleCanvasClick(e);
+      }
+      pendingPan = null;
+    });
+
+    function getTouchDistance(touches) {
+      if (touches.length < 2) return 0;
+      var dx = touches[0].clientX - touches[1].clientX;
+      var dy = touches[0].clientY - touches[1].clientY;
+      return Math.hypot(dx, dy);
+    }
+
+    workspaceEl.addEventListener('touchstart', function(e) {
+      if (e.touches.length === 2) {
+        pinchZoom.active = true;
+        pinchZoom.startDistance = getTouchDistance(e.touches);
+        pinchZoom.startZoom = zoomScale;
+      } else if (e.touches.length === 1) {
+        if (state.toolMode === 'line') {
+          handleMouseDown({ button: 0, clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
+        } else {
+          pendingPan = { x: e.touches[0].clientX, y: e.touches[0].clientY, panX: panX, panY: panY, moved: false };
+        }
+      }
+    }, { passive: false });
+
+    workspaceEl.addEventListener('touchmove', function(e) {
+      if (state.toolMode === 'line') {
+        if (e.touches.length === 1 && state.isDrawingLine) {
+          handleMouseMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
+        }
+        return;
+      }
+
+      if (e.touches.length === 2 && pinchZoom.active) {
+        e.preventDefault();
+        var dist = getTouchDistance(e.touches);
+        if (dist > 0) {
+          var scaleFactor = dist / pinchZoom.startDistance;
+          zoomScale = Math.min(Math.max(0.2, pinchZoom.startZoom * scaleFactor), 10);
+          updateTransform();
+        }
+        return;
+      }
+
+      if (e.touches.length === 1 && pendingPan) {
+        var touch = e.touches[0];
+        var dx = touch.clientX - pendingPan.x;
+        var dy = touch.clientY - pendingPan.y;
+        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+          pendingPan.moved = true;
+          panX = pendingPan.panX + dx;
+          panY = pendingPan.panY + dy;
+          updateTransform();
+        }
+      }
+    }, { passive: false });
+
+    workspaceEl.addEventListener('touchend', function(e) {
+      if (state.toolMode === 'line') {
+        handleMouseUp({ button: 0, clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY });
+        return;
+      }
+      if (e.changedTouches.length === 1 && pendingPan && !pendingPan.moved) {
+        var touch = e.changedTouches[0];
+        handleCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
+      }
+      pendingPan = null;
+      pinchZoom.active = false;
+    });
+
+    /* Click-To-Delete Handlers (markers removed via proximity check in handleCanvasClick) */
+
+    function removeLine(lineId, e) {
+      if (e) e.stopPropagation();
+      var lvl = getActiveLevel();
+      if (!lvl) return;
+      pushUndo();
+      lvl.lines = lvl.lines.filter(function(l) { return l.id !== lineId; });
+      if (state.selectedLineId === lineId) state.selectedLineId = null;
+      saveData();
+      renderLines();
+      showToast('Circuit line deleted', 'info');
+    }
+
+    function getCanvasPointFromEvent(event) {
+      var planContainer = document.getElementById('planContainer');
+      var imgEl = document.getElementById('planImage');
+      if (!planContainer || !imgEl || !imgEl.naturalWidth || !imgEl.naturalHeight) return null;
+
+      var rect = planContainer.getBoundingClientRect();
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) return null;
+
+      var xPct = ((event.clientX - rect.left) / rect.width) * 100;
+      var yPct = ((event.clientY - rect.top) / rect.height) * 100;
+      return { xPct: Math.min(Math.max(0, xPct), 100), yPct: Math.min(Math.max(0, yPct), 100) };
+    }
+
+    function handleMouseDown(e) {
+      if (e.button !== 0 || isPanning) return;
+      var point = getCanvasPointFromEvent(e);
+      if (!point) return;
+
+      if (state.toolMode === 'line') {
+        state.isDrawingLine = true;
+        state.lineStart = { xPct: point.xPct, yPct: point.yPct };
+      }
+    }
+
+    function handleMouseMove(e) {
+      if (state.toolMode === 'line' && state.isDrawingLine) {
+        var point = getCanvasPointFromEvent(e);
+        if (!point) return;
+        renderPreviewLine(state.lineStart.xPct, state.lineStart.yPct, point.xPct, point.yPct, activeLineColor, state.lineThickness, state.lineStyle, state.lineArc);
+      }
+    }
+
+    function handleMouseUp(e) {
+      if (state.toolMode === 'line' && state.isDrawingLine) {
+        state.isDrawingLine = false;
+        var point = getCanvasPointFromEvent(e);
+        if (!point) {
+          removePreviewLine();
+          return;
+        }
+
+        if (Math.hypot(point.xPct - state.lineStart.xPct, point.yPct - state.lineStart.yPct) > 0.5) {
+          var lvl = getActiveLevel();
+          if (lvl) {
+            pushUndo();
+            var newLineId = 'line_' + Date.now();
+            state.selectedLineId = newLineId;
+            lvl.lines.push({
+              id: newLineId,
+              x1Pct: state.lineStart.xPct,
+              y1Pct: state.lineStart.yPct,
+              x2Pct: point.xPct,
+              y2Pct: point.yPct,
+              color: activeLineColor,
+              thickness: state.lineThickness,
+              style: state.lineStyle,
+              arc: state.lineArc
+            });
+            saveData();
+            renderLines();
+          }
+        }
+        removePreviewLine();
+        return;
+      }
+
+      if (state.toolMode === 'marker' && e.button === 0 && !isPanning) {
+        handleCanvasClick(e);
+      }
+    }
+
+    function removeExistingMarkerAtPoint(xPct, yPct, event) {
+      var lvl = getActiveLevel();
+      if (!lvl || !lvl.markers) return false;
+
+      var markerTarget = event && event.target && event.target.closest ? event.target.closest('.marker') : null;
+      var existing = markerTarget && markerTarget.dataset.markerId ?
+        lvl.markers.find(function(m) { return m.id === markerTarget.dataset.markerId; }) : null;
+
+      var planContainer = document.getElementById('planContainer');
+      if (!planContainer) return false;
+      var planRect = planContainer.getBoundingClientRect();
+      var markerRadiusX = (state.markerSize / 2) / planRect.width * 100;
+      var markerRadiusY = (state.markerSize / 2) / planRect.height * 100;
+      if (!existing) {
+        existing = lvl.markers.find(function(m) {
+          var dx = (m.xPct - xPct) / markerRadiusX;
+          var dy = (m.yPct - yPct) / markerRadiusY;
+          return Math.hypot(dx, dy) <= 1;
+        });
+      }
+
+      if (!existing) return false;
+
+      pushUndo();
+      lvl.markers = lvl.markers.filter(function(m) { return m.id !== existing.id; });
+      saveData();
+      renderAll();
+      showToast('Device marker removed', 'info');
+      return true;
+    }
+
+    function handleCanvasClick(event) {
+      var lvl = getActiveLevel();
+      if (!lvl || !lvl.imageData) return;
+
+      var point = getCanvasPointFromEvent(event);
+      if (!point) return;
+
+      if (removeExistingMarkerAtPoint(point.xPct, point.yPct, event)) return;
+      if (!state.activeDeviceId) return;
+
+      pushUndo();
+      lvl.markers.push({
+        id: 'm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        deviceId: state.activeDeviceId,
+        xPct: point.xPct,
+        yPct: point.yPct
+      });
+
+      saveData();
+      renderAll();
+    }
+
+    function renderPreviewLine(x1, y1, x2, y2, color, thickness, style, arc) {
+      removePreviewLine();
+      var svg = document.getElementById('svgOverlay');
+      if (!svg) return;
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('id', 'previewLine');
+      path.setAttribute('d', getArcPath(x1, y1, x2, y2, arc));
+      path.setAttribute('stroke', color);
+      path.setAttribute('stroke-width', thickness || 4);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-dasharray', getDashArray(style, thickness || 4));
+      path.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(path);
+    }
+
+    function removePreviewLine() {
+      var prev = document.getElementById('previewLine');
+      if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+    }
+
+    function renderLines() {
+      var svg = document.getElementById('svgOverlay');
+      if (!svg) return;
+      var lvl = getActiveLevel();
+      if (!lvl || !lvl.lines) {
+        svg.innerHTML = '';
+        return;
+      }
+
+      var html = '';
+      lvl.lines.forEach(function(l) {
+        var thick = l.thickness || 4;
+        var style = l.style || 'dotted';
+        var dash = getDashArray(style, thick);
+        var pathD = getArcPath(l.x1Pct, l.y1Pct, l.x2Pct, l.y2Pct, l.arc || 0);
+
+        html += '<path vector-effect="non-scaling-stroke" d="' + pathD + '" fill="none" ' +
+                'stroke="' + l.color + '" stroke-width="' + thick + '" stroke-linecap="round" stroke-dasharray="' + dash + '" ' +
+                'style="pointer-events:stroke; cursor:pointer;" onclick="removeLine(\'' + l.id + '\', event)">' +
+                '<title>Click to delete circuit line</title></path>';
+      });
+      svg.innerHTML = html;
+    }
+
+    function selectDevice(devId) {
+      state.activeDeviceId = devId;
+      state.openColorPickerDevId = null;
+      state.openIconPickerDevId = null;
+      setToolMode('marker');
+    }
+
+    function toggleCustomDeviceForm(value) {
+      var form = document.getElementById('customDeviceForm');
+      if (!form) return;
+      var isOpen = !!(value && value.trim().length > 0);
+      form.classList.toggle('collapsed', !isOpen);
+    }
+
+    function updatePrice(devId, newPrice) {
+      var dev = state.devices.find(function(d) { return d.id === devId; });
+      if (dev) {
+        pushUndo();
+        dev.price = parseFloat(newPrice) || 0;
+        saveData();
+        renderAll();
+      }
+    }
+
+    function toggleCardColorPicker(devId, e) {
+      if (e) e.stopPropagation();
+      state.openColorPickerDevId = (state.openColorPickerDevId === devId) ? null : devId;
+      state.openIconPickerDevId = null;
+      renderDevicePalette();
+    }
+
+    function toggleCardIconPicker(devId, e) {
+      if (e) e.stopPropagation();
+      state.openIconPickerDevId = (state.openIconPickerDevId === devId) ? null : devId;
+      state.openColorPickerDevId = null;
+      renderDevicePalette();
+    }
+
+    function setDeviceColor(devId, rgbaColor) {
+      var dev = state.devices.find(function(d) { return d.id === devId; });
+      if (dev) {
+        pushUndo();
+        dev.color = rgbaColor;
+        state.openColorPickerDevId = null;
+        saveData();
+        renderAll();
+      }
+    }
+
+    function setDeviceIcon(devId, icon) {
+      var dev = state.devices.find(function(d) { return d.id === devId; });
+      if (dev) {
+        pushUndo();
+        dev.icon = icon;
+        state.openIconPickerDevId = null;
+        saveData();
+        renderAll();
+      }
+    }
+
+    function selectNewDevRadialColor(rgba) { selectedNewDevColor = rgba; renderNewDevColorGrid(); }
+    function selectNewDevIcon(icon) { selectedNewDevIcon = icon; renderNewDevIconGrid(); }
+    function selectLineColor(solidColor) {
+      activeLineColor = solidColor;
+      renderLineColorGrid();
+    }
+
+    function renderLineColorGrid() {
+      var grid = document.getElementById('lineColorGrid');
+      var html = '';
+      PRESET_COLORS.forEach(function(c) {
+        var isActive = (activeLineColor === c.solid) ? 'active' : '';
+        html += '<div class="radial-dial ' + isActive + '" style="background:' + c.solid + '" onclick="selectLineColor(\'' + c.solid + '\')"></div>';
+      });
+      grid.innerHTML = html;
+    }
+
+    function renderNewDevColorGrid() {
+      var grid = document.getElementById('newDevRadialGrid');
+      var html = '';
+      PRESET_COLORS.forEach(function(c) {
+        var isActive = (selectedNewDevColor === c.rgba) ? 'active' : '';
+        html += '<div class="radial-dial ' + isActive + '" style="background:' + c.rgba + '" onclick="selectNewDevRadialColor(\'' + c.rgba + '\')"></div>';
+      });
+      grid.innerHTML = html;
+    }
+
+    function renderNewDevIconGrid() {
+      var grid = document.getElementById('newDevIconGrid');
+      var html = '';
+      PRESET_ICONS.forEach(function(icon) {
+        var isActive = (selectedNewDevIcon === icon) ? 'active' : '';
+        html += '<div class="icon-option ' + isActive + '" onclick="selectNewDevIcon(\'' + icon + '\')">' + icon + '</div>';
+      });
+      grid.innerHTML = html;
+    }
+
+    function addCustomDevice() {
+      var name = document.getElementById('newDevName').value.trim();
+      var price = parseFloat(document.getElementById('newDevPrice').value) || 0;
+      if (!name) return;
+
+      pushUndo();
+      var newDev = { id: 'dev_' + Date.now(), name: name, price: price, color: selectedNewDevColor, icon: selectedNewDevIcon };
+      state.devices.push(newDev);
+      selectDevice(newDev.id);
+      document.getElementById('newDevName').value = '';
+      saveData();
+      renderAll();
+      showToast('Added device type', 'success');
+    }
+
+    function removeDeviceType(devId) {
+      showConfirm('Delete Device Type', 'Delete device type and all placed markers across levels?', function() {
+        pushUndo();
+        state.devices = state.devices.filter(function(d) { return d.id !== devId; });
+        state.levels.forEach(function(lvl) {
+          lvl.markers = lvl.markers.filter(function(m) { return m.deviceId !== devId; });
+        });
+        if (state.activeDeviceId === devId && state.devices.length > 0) {
+          state.activeDeviceId = state.devices[0].id;
+        }
+        saveData();
+        renderAll();
+      });
+    }
+
+    function exportSummary() {
+      var text = 'ELECTRICAL ESTIMATE & TAKEOFF SUMMARY\n------------------------------------\n';
+      var grandTotal = 0;
+
+      state.levels.forEach(function(lvl) {
+        text += '\n📍 ' + lvl.name.toUpperCase() + ':\n';
+        var lvlTotal = 0;
+
+        state.devices.forEach(function(dev) {
+          var count = lvl.markers.filter(function(m) { return m.deviceId === dev.id; }).length;
+          if (count > 0) {
+            var sub = count * dev.price;
+            lvlTotal += sub;
+            text += '  • ' + (dev.icon || '') + ' ' + dev.name + ': ' + count + 'x @ $' + dev.price.toFixed(2) + ' = $' + sub.toFixed(2) + '\n';
+          }
+        });
+
+        text += '  Level Subtotal: $' + lvlTotal.toFixed(2) + '\n';
+        grandTotal += lvlTotal;
+      });
+
+      text += '\n------------------------------------\nGRAND TOTAL: $' + grandTotal.toFixed(2);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          showToast('Summary copied to clipboard!', 'success');
+        }).catch(function() {
+          showToast('Clipboard blocked by browser - copy manually', 'warning');
+          console.log(text);
+        });
+      } else {
+        showToast('Clipboard unavailable in this browser', 'warning');
+        console.log(text);
+      }
+    }
+
+    function renderTabs() {
+      var container = document.getElementById('levelTabs');
+      var html = '';
+      state.levels.forEach(function(lvl) {
+        var activeClass = lvl.id === state.activeLevelId ? 'active' : '';
+        html += '<button class="tab-btn ' + activeClass + '" onclick="switchLevel(\'' + lvl.id + '\')" ondblclick="renameLevel(\'' + lvl.id + '\')" title="Double-click to rename">' + escapeHtml(lvl.name) + '</button>';
+      });
+      html += '<button class="add-tab-btn" onclick="addNewLevel()">+ Level</button>';
+      if (state.levels.length > 1) {
+        html += '<button class="add-tab-btn" style="background:#7f1d1d;" onclick="deleteLevel(\'' + state.activeLevelId + '\')" title="Delete current floor">🗑️ Floor</button>';
+      }
+      container.innerHTML = html;
+    }
+
+    function renameLevel(lvlId) {
+      var lvl = state.levels.find(function(l) { return l.id === lvlId; });
+      if (!lvl) return;
+      var name = prompt('Rename floor:', lvl.name);
+      if (!name || !name.trim()) return;
+      pushUndo();
+      lvl.name = name.trim();
+      saveData();
+      renderAll();
+    }
+
+    function deleteLevel(lvlId) {
+      if (state.levels.length <= 1) return;
+      var lvl = state.levels.find(function(l) { return l.id === lvlId; });
+      if (!lvl) return;
+      showConfirm('Delete Floor', 'Delete "' + lvl.name + '" and all its markers/lines? This cannot be undone.', function() {
+        state.levels = state.levels.filter(function(l) { return l.id !== lvlId; });
+        delete floorHistory[state.activeClientId + '::' + lvlId];
+        if (state.activeLevelId === lvlId) state.activeLevelId = state.levels[0].id;
+        saveData();
+        renderAll();
+        showToast('Floor deleted', 'danger');
+      });
+    }
+
+    var draggedDeviceId = null;
+
+    function handleDeviceDragStart(e, devId) {
+      draggedDeviceId = devId;
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', devId); } catch(err) {}
+      e.currentTarget.classList.add('dragging');
+    }
+
+    function handleDeviceDragOver(e, devId) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (devId !== draggedDeviceId) e.currentTarget.classList.add('drag-over');
+    }
+
+    function handleDeviceDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+
+    function handleDeviceDrop(e, targetDevId) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      if (!draggedDeviceId || draggedDeviceId === targetDevId) return;
+
+      var fromIdx = state.devices.findIndex(function(d) { return d.id === draggedDeviceId; });
+      var toIdx = state.devices.findIndex(function(d) { return d.id === targetDevId; });
+      if (fromIdx < 0 || toIdx < 0) return;
+
+      pushUndo();
+      var moved = state.devices.splice(fromIdx, 1)[0];
+      state.devices.splice(toIdx, 0, moved);
+      saveData();
+      renderAll();
+      showToast('Reordered devices', 'info');
+      draggedDeviceId = null;
+    }
+
+    function handleDeviceDragEnd(e) {
+      e.currentTarget.classList.remove('dragging');
+      draggedDeviceId = null;
+    }
+
+    function renderDevicePalette() {
+      var container = document.getElementById('devicePalette');
+      var activeLvl = getActiveLevel();
+      var html = '';
+
+      state.devices.forEach(function(dev) {
+        var isSelected = (state.toolMode === 'marker' && dev.id === state.activeDeviceId);
+        var count = activeLvl ? activeLvl.markers.filter(function(m) { return m.deviceId === dev.id; }).length : 0;
+
+        html += '<div class="device-card ' + (isSelected ? 'selected' : '') + '" draggable="true" ondragstart="handleDeviceDragStart(event, \'' + dev.id + '\')" ondragover="handleDeviceDragOver(event, \'' + dev.id + '\')" ondragleave="handleDeviceDragLeave(event)" ondrop="handleDeviceDrop(event, \'' + dev.id + '\')" ondragend="handleDeviceDragEnd(event)" onclick="selectDevice(\'' + dev.id + '\')">';
+        html += '  <div class="device-header">';
+        html += '    <div class="device-info">';
+        html += '      <span class="drag-handle" title="Drag to reorder" onclick="event.stopPropagation()">⠿</span>';
+        html += '      <div class="symbol-badge" onclick="toggleCardIconPicker(\'' + dev.id + '\', event)">' + escapeHtml(dev.icon || '📍') + '</div>';
+        html += '      <div>';
+        html += '        <div style="display:flex; align-items:center; gap:6px;">';
+        html += '          <span class="device-name">' + escapeHtml(dev.name) + '</span>';
+        html += '          <span class="active-badge">ACTIVE</span>';
+        html += '        </div>';
+        html += '        <div style="font-size:11px; color:#94a3b8;">Count: <b style="color:#34d399;">' + count + '</b> | Subtotal: <b style="color:#34d399;">$' + (count * dev.price).toFixed(2) + '</b></div>';
+        html += '      </div>';
+        html += '    </div>';
+
+        html += '    <div style="display:flex; align-items:center; gap:6px;">';
+        html += '      <div class="color-dot-btn" style="background:' + dev.color + '" onclick="toggleCardColorPicker(\'' + dev.id + '\', event)"></div>';
+        html += '      $<input type="number" value="' + dev.price + '" class="price-input" onclick="event.stopPropagation()" onchange="updatePrice(\'' + dev.id + '\', this.value)" />';
+        if (state.devices.length > 1) {
+          html += '      <button onclick="event.stopPropagation(); removeDeviceType(\'' + dev.id + '\')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:12px;">🗑️</button>';
+        }
+        html += '    </div>';
+        html += '  </div>';
+
+        if (state.openColorPickerDevId === dev.id) {
+          html += '  <div class="collapsible-box" onclick="event.stopPropagation()">';
+          html += '    <div class="radial-dial-row">';
+          PRESET_COLORS.forEach(function(c) {
+            var isActive = (dev.color === c.rgba) ? 'active' : '';
+            html += '      <div class="radial-dial ' + isActive + '" style="background:' + c.rgba + '" onclick="setDeviceColor(\'' + dev.id + '\', \'' + c.rgba + '\')"></div>';
+          });
+          html += '    </div>';
+          html += '  </div>';
+        }
+
+        if (state.openIconPickerDevId === dev.id) {
+          html += '  <div class="collapsible-box" onclick="event.stopPropagation()">';
+          html += '    <div class="icon-picker-grid">';
+          PRESET_ICONS.forEach(function(icon) {
+            var isActive = (dev.icon === icon) ? 'active' : '';
+            html += '      <div class="icon-option ' + isActive + '" onclick="setDeviceIcon(\'' + dev.id + '\', \'' + icon + '\')">' + icon + '</div>';
+          });
+          html += '    </div>';
+          html += '  </div>';
+        }
+
+        html += '</div>';
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderCanvas() {
+      var lvl = getActiveLevel();
+      var imgEl = document.getElementById('planImage');
+      var uploadOverlay = document.getElementById('uploadOverlay');
+      var overlay = document.getElementById('markerOverlay');
+      var targetLvlText = document.getElementById('targetLevelNameText');
+
+      if (lvl) {
+        targetLvlText.innerText = lvl.name;
+      }
+
+      if (lvl && lvl.imageData) {
+        if (imgEl.getAttribute('src') !== lvl.imageData) imgEl.src = lvl.imageData;
+        imgEl.style.display = 'block';
+        uploadOverlay.style.display = 'none';
+        imgEl.classList.toggle('hd-enhance', state.isHDEnhance);
+      } else {
+        imgEl.style.display = 'none';
+        uploadOverlay.style.display = 'flex';
+      }
+
+      overlay.innerHTML = '';
+      if (lvl && lvl.markers) {
+        lvl.markers.forEach(function(m) {
+          var dev = state.devices.find(function(d) { return d.id === m.deviceId; });
+          if (!dev) return;
+
+          var markerEl = document.createElement('div');
+          markerEl.className = 'marker';
+          markerEl.style.left = m.xPct + '%';
+          markerEl.style.top = m.yPct + '%';
+          markerEl.style.backgroundColor = dev.color;
+          markerEl.dataset.markerId = m.id;
+          markerEl.innerText = '';
+          markerEl.title = dev.name + ' (Click to remove)';
+
+          overlay.appendChild(markerEl);
+        });
+      }
+
+      renderLines();
+      updateTransform();
+    }
+
+    function renderSummary() {
+      var summaryRows = document.getElementById('summaryRows');
+      var grandTotalEl = document.getElementById('grandTotal');
+      var totalCost = 0;
+      var html = '';
+
+      state.levels.forEach(function(lvl) {
+        var lvlTotal = 0;
+        lvl.markers.forEach(function(m) {
+          var dev = state.devices.find(function(d) { return d.id === m.deviceId; });
+          if (dev) lvlTotal += parseFloat(dev.price || 0);
+        });
+
+        totalCost += lvlTotal;
+        html += '<div class="summary-row">';
+        html += '  <span>' + lvl.name + ' (' + lvl.markers.length + ' items)</span>';
+        html += '  <span style="font-weight:bold;">$' + lvlTotal.toFixed(2) + '</span>';
+        html += '</div>';
+      });
+
+      summaryRows.innerHTML = html;
+      grandTotalEl.innerText = '$' + totalCost.toFixed(2);
+    }
+
+    function renderAll() {
+      renderClientSelect();
+      updateMarkerSize(state.markerSize);
+      updateLineThickness(state.lineThickness, false);
+      setLineStyle(state.lineStyle, false);
+      updateLineArc(state.lineArc, false);
+
+      renderTabs();
+      renderLineColorGrid();
+      renderNewDevColorGrid();
+      renderNewDevIconGrid();
+      renderDevicePalette();
+      renderCanvas();
+      renderSummary();
+      toggleCustomDeviceForm(document.getElementById('newDevName') ? document.getElementById('newDevName').value : '');
+      updateUndoRedoButtons();
+    }
+
+    renderAll();
+    setTimeout(function() {
+      var img = document.getElementById('planImage');
+      if (img && img.style.display !== 'none' && img.naturalWidth) fitSchematicFullSize();
+    }, 120);
+  </script>
+</body>
+</html>
