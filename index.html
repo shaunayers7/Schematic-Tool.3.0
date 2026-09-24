@@ -397,6 +397,57 @@
       } catch(e) { return fallback; }
     }
 
+    var clientDatabase = null;
+    var clientDatabaseReady = false;
+    var pendingClientSave = false;
+
+    function openClientDatabase() {
+      if (!window.indexedDB) return;
+
+      var request = window.indexedDB.open('schematic_tool_v51', 1);
+      request.onupgradeneeded = function(event) {
+        event.target.result.createObjectStore('app', { keyPath: 'id' });
+      };
+      request.onsuccess = function(event) {
+        clientDatabase = event.target.result;
+        var transaction = clientDatabase.transaction('app', 'readwrite');
+        var store = transaction.objectStore('app');
+        var readRequest = store.get('clients');
+
+        readRequest.onsuccess = function() {
+          if (Array.isArray(readRequest.result && readRequest.result.value) && readRequest.result.value.length > 0) {
+            state.clients = readRequest.result.value;
+            state.activeClientId = state.clients[0].id;
+            syncActiveClientFromState();
+            renderAll();
+          } else {
+            store.put({ id: 'clients', value: state.clients });
+          }
+
+          clientDatabaseReady = true;
+          if (pendingClientSave) saveClientsToDatabase();
+          try { localStorage.removeItem('eb_clients_v51'); } catch(e) {}
+        };
+      };
+      request.onerror = function() { clientDatabase = null; };
+    }
+
+    function saveClientsToDatabase() {
+      if (!clientDatabaseReady || !clientDatabase) {
+        pendingClientSave = true;
+        return;
+      }
+
+      pendingClientSave = false;
+      try {
+        var transaction = clientDatabase.transaction('app', 'readwrite');
+        transaction.objectStore('app').put({ id: 'clients', value: state.clients });
+      } catch(e) {
+        pendingClientSave = true;
+        console.error('IndexedDB save failed', e);
+      }
+    }
+
     function loadClients() {
       var clients = loadData('eb_clients_v51', null);
       if (Array.isArray(clients) && clients.length > 0) return clients;
@@ -608,9 +659,8 @@
     function saveData() {
       try {
         syncActiveClientToState();
-        var serializedClients = JSON.stringify(state.clients);
+        saveClientsToDatabase();
         localStorage.removeItem('eb_clients_v51_recovery');
-        localStorage.setItem('eb_clients_v51', serializedClients);
         localStorage.setItem('eb_markersize_v51', JSON.stringify(state.markerSize));
         localStorage.setItem('eb_linethickness_v51', JSON.stringify(state.lineThickness));
         localStorage.setItem('eb_linestyle_v51', JSON.stringify(state.lineStyle));
@@ -2024,6 +2074,7 @@
     });
 
     renderAll();
+    openClientDatabase();
     setTimeout(function() {
       var img = document.getElementById('planImage');
       if (img && img.style.display !== 'none' && img.naturalWidth) fitSchematicFullSize();
