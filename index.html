@@ -122,6 +122,15 @@
     /* Zoom Menu */
     .zoom-controls { position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, 0.90); backdrop-filter: blur(8px); border: 1px solid #334155; padding: 4px 6px; border-radius: 8px; display: flex; align-items: center; gap: 4px; z-index: 300; }
     .pan-hint { position: absolute; top: 10px; right: 10px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); border: 1px solid #334155; padding: 4px 8px; border-radius: 20px; font-size: 10px; color: #94a3b8; pointer-events: none; z-index: 300; }
+    .focus-toggle { position: absolute; right: 10px; bottom: 10px; z-index: 400; }
+    body.focus-mode header { display: none; }
+    body.focus-mode .app-body { height: 100dvh; }
+    body.focus-mode .sidebar { display: none; }
+    body.focus-mode .focus-toggle { background: #10b981; color: #020617; }
+
+    @media (max-width: 768px) {
+      body.focus-mode .workspace { height: 100dvh !important; }
+    }
 
     /* Notifications & Modals */
     .toast-container { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
@@ -289,6 +298,7 @@
       </div>
 
       <div class="pan-hint">💡 Drag to Pan • Click dots/lines to delete</div>
+      <button class="btn btn-secondary focus-toggle" id="focusToggle" onclick="toggleFocusMode()" title="Hide menus and show the full schematic">⛶ Focus</button>
 
       <div class="plan-container" id="planContainer">
         <img id="planImage" class="plan-image" style="display:none;" />
@@ -391,6 +401,7 @@
       lineStyle: loadData('eb_linestyle_v51', 'dotted'),
       lineArc: loadData('eb_linearc_v51', 0),
       isHDEnhance: false,
+      focusMode: false,
       isDrawingLine: false,
       lineStart: { xPct: 0, yPct: 0 },
       devices: DEFAULT_DEVICES,
@@ -1072,6 +1083,14 @@
       showToast(state.isHDEnhance ? 'HD image enhancement enabled' : 'HD image enhancement disabled', 'info');
     }
 
+    function toggleFocusMode() {
+      state.focusMode = !state.focusMode;
+      document.body.classList.toggle('focus-mode', state.focusMode);
+      var button = document.getElementById('focusToggle');
+      button.innerText = state.focusMode ? '↙ Exit Focus' : '⛶ Focus';
+      button.title = state.focusMode ? 'Show menus and estimate summary' : 'Hide menus and show the full schematic';
+    }
+
     function fitSchematicFullSize() {
       var workspace = document.getElementById('workspace');
       var img = document.getElementById('planImage');
@@ -1109,7 +1128,7 @@
 
     var workspaceEl = document.getElementById('workspace');
     var pendingPan = null;
-    var pinchZoom = { active: false, startDistance: 0, startZoom: 1 };
+    var pinchZoom = { active: false, startDistance: 0, startZoom: 1, contentX: 0, contentY: 0 };
 
     function setZoomFromCenter(factor) {
       var ws = document.getElementById('workspace');
@@ -1190,6 +1209,11 @@
         pinchZoom.active = true;
         pinchZoom.startDistance = getTouchDistance(e.touches);
         pinchZoom.startZoom = zoomScale;
+        var startCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        var startCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        var workspaceRect = workspaceEl.getBoundingClientRect();
+        pinchZoom.contentX = (startCenterX - workspaceRect.left - panX) / zoomScale;
+        pinchZoom.contentY = (startCenterY - workspaceRect.top - panY) / zoomScale;
       } else if (e.touches.length === 1) {
         if (state.toolMode === 'line') {
           handleMouseDown({ button: 0, clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
@@ -1212,7 +1236,13 @@
         var dist = getTouchDistance(e.touches);
         if (dist > 0) {
           var scaleFactor = dist / pinchZoom.startDistance;
-          zoomScale = Math.min(Math.max(0.2, pinchZoom.startZoom * scaleFactor), 10);
+          var newScale = Math.min(Math.max(0.2, pinchZoom.startZoom * scaleFactor), 10);
+          var centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+          var centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+          var rect = workspaceEl.getBoundingClientRect();
+          panX = centerX - rect.left - pinchZoom.contentX * newScale;
+          panY = centerY - rect.top - pinchZoom.contentY * newScale;
+          zoomScale = newScale;
           updateTransform();
         }
         return;
