@@ -1397,7 +1397,7 @@
       var point = getCanvasPointFromEvent(event);
       if (!point) return;
 
-      if (removeExistingMarkerAtPoint(point.xPct, point.yPct, event)) return;
+      if (!state.focusMode && removeExistingMarkerAtPoint(point.xPct, point.yPct, event)) return;
       if (!state.activeDeviceId) return;
 
       pushUndo();
