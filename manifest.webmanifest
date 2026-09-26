@@ -1,0 +1,19 @@
+{
+  "name": "Electric Boyes Worksite Hub",
+  "short_name": "Electric Boyes",
+  "description": "Worksite tools and references for Electric Boyes.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f1f3ef",
+  "theme_color": "#17231f",
+  "icons": [
+    {
+      "src": "app/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
