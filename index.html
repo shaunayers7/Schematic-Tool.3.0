@@ -465,6 +465,8 @@
     var selectedNewDevColor = PRESET_COLORS[0].rgba;
     var selectedNewDevIcon = PRESET_ICONS[0];
     var activeLineColor = PRESET_COLORS[0].solid;
+    var DEFAULT_MARKER_SIZE = 28;
+    var legacyMarkerSize = parseInt(loadData('eb_markersize_v51', DEFAULT_MARKER_SIZE), 10) || DEFAULT_MARKER_SIZE;
 
     var state = {
       activeClientId: null,
@@ -476,7 +478,7 @@
       selectedLineId: null,
       openColorPickerDevId: null,
       openIconPickerDevId: null,
-      markerSize: loadData('eb_markersize_v51', 28),
+      markerSize: legacyMarkerSize,
       lineThickness: loadData('eb_linethickness_v51', 4),
       lineStyle: loadData('eb_linestyle_v51', 'dotted'),
       lineArc: loadData('eb_linearc_v51', 0),
@@ -487,9 +489,9 @@
       lineStart: { xPct: 0, yPct: 0 },
       devices: DEFAULT_DEVICES,
       levels: [
-        { id: 'lvl_main', name: 'Main Floor', imageData: null, markers: [], lines: [] },
-        { id: 'lvl_upper', name: 'Upper Floor', imageData: null, markers: [], lines: [] },
-        { id: 'lvl_basement', name: 'Basement', imageData: null, markers: [], lines: [] }
+        { id: 'lvl_main', name: 'Main Floor', imageData: null, markers: [], lines: [], markerSize: legacyMarkerSize },
+        { id: 'lvl_upper', name: 'Upper Floor', imageData: null, markers: [], lines: [], markerSize: legacyMarkerSize },
+        { id: 'lvl_basement', name: 'Basement', imageData: null, markers: [], lines: [], markerSize: legacyMarkerSize }
       ]
     };
 
@@ -602,7 +604,8 @@
         name: found.name,
         imageData: found.imageData,
         markers: found.markers || [],
-        lines: found.lines || []
+        lines: found.lines || [],
+        markerSize: getLevelMarkerSize(found)
       }));
     }
 
@@ -614,7 +617,8 @@
         id: levelId,
         markers: snapshot.markers || [],
         lines: snapshot.lines || [],
-        imageData: snapshot.imageData || null
+        imageData: snapshot.imageData || null,
+        markerSize: getLevelMarkerSize(snapshot)
       });
     }
 
@@ -661,7 +665,6 @@
         syncActiveClientToState();
         saveClientsToDatabase();
         localStorage.removeItem('eb_clients_v51_recovery');
-        localStorage.setItem('eb_markersize_v51', JSON.stringify(state.markerSize));
         localStorage.setItem('eb_linethickness_v51', JSON.stringify(state.lineThickness));
         localStorage.setItem('eb_linestyle_v51', JSON.stringify(state.lineStyle));
         localStorage.setItem('eb_linearc_v51', JSON.stringify(state.lineArc));
@@ -749,9 +752,9 @@
         address: address,
         devices: JSON.parse(JSON.stringify(DEFAULT_DEVICES)),
         levels: [
-          { id: 'lvl_main', name: 'Main Floor', imageData: null, markers: [], lines: [] },
-          { id: 'lvl_upper', name: 'Upper Floor', imageData: null, markers: [], lines: [] },
-          { id: 'lvl_basement', name: 'Basement', imageData: null, markers: [], lines: [] }
+          { id: 'lvl_main', name: 'Main Floor', imageData: null, markers: [], lines: [], markerSize: DEFAULT_MARKER_SIZE },
+          { id: 'lvl_upper', name: 'Upper Floor', imageData: null, markers: [], lines: [], markerSize: DEFAULT_MARKER_SIZE },
+          { id: 'lvl_basement', name: 'Basement', imageData: null, markers: [], lines: [], markerSize: DEFAULT_MARKER_SIZE }
         ]
       };
 
@@ -955,7 +958,7 @@
 
           var cx = (m.xPct / 100) * w;
           var cy = (m.yPct / 100) * h;
-          var radius = (state.markerSize / 2) * (w / 1000);
+          var radius = (getLevelMarkerSize(lvl) / 2) * (w / 1000);
 
           ctx.beginPath();
           ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
@@ -976,7 +979,13 @@
       }
       if (lvl && !lvl.lines) lvl.lines = [];
       if (lvl && !lvl.markers) lvl.markers = [];
+      if (lvl) lvl.markerSize = getLevelMarkerSize(lvl);
       return lvl;
+    }
+
+    function getLevelMarkerSize(level) {
+      var markerSize = parseInt(level && level.markerSize, 10);
+      return markerSize >= 5 && markerSize <= 60 ? markerSize : legacyMarkerSize;
     }
 
     function rotatePercentPoint(xPct, yPct, degrees) {
@@ -1077,7 +1086,7 @@
       var name = prompt('Level Name (e.g. Garage / Patio):');
       if (!name) return;
       pushUndo();
-      var newLvl = { id: 'lvl_' + Date.now(), name: name, imageData: null, markers: [], lines: [] };
+      var newLvl = { id: 'lvl_' + Date.now(), name: name, imageData: null, markers: [], lines: [], markerSize: DEFAULT_MARKER_SIZE };
       state.levels.push(newLvl);
       state.activeLevelId = newLvl.id;
       saveData();
@@ -1100,9 +1109,12 @@
 
     /* Controls & Drawing Modes */
     function updateMarkerSize(val, persist) {
-      state.markerSize = parseInt(val, 10) || 28;
+      state.markerSize = parseInt(val, 10) || DEFAULT_MARKER_SIZE;
+      var lvl = getActiveLevel();
+      if (lvl) lvl.markerSize = state.markerSize;
       document.documentElement.style.setProperty('--marker-size', state.markerSize + 'px');
       document.getElementById('markerSizeVal').innerText = state.markerSize + 'px';
+      document.getElementById('markerSizeSlider').value = state.markerSize;
       if (persist) scheduleSaveData();
     }
 
@@ -1575,8 +1587,9 @@
       var planContainer = document.getElementById('planContainer');
       if (!planContainer) return false;
       var planRect = planContainer.getBoundingClientRect();
-      var markerRadiusX = (state.markerSize / 2) / planRect.width * 100;
-      var markerRadiusY = (state.markerSize / 2) / planRect.height * 100;
+      var markerSize = getLevelMarkerSize(lvl);
+      var markerRadiusX = (markerSize / 2) / planRect.width * 100;
+      var markerRadiusY = (markerSize / 2) / planRect.height * 100;
       if (!existing) {
         existing = lvl.markers.find(function(m) {
           var dx = (m.xPct - xPct) / markerRadiusX;
@@ -2046,7 +2059,7 @@
 
     function renderAll() {
       renderClientSelect();
-      updateMarkerSize(state.markerSize);
+      updateMarkerSize(getLevelMarkerSize(getActiveLevel()));
       updateLineThickness(state.lineThickness, false);
       setLineStyle(state.lineStyle, false);
       updateLineArc(state.lineArc, false);
