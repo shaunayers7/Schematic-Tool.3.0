@@ -1,4 +1,4 @@
-var CACHE_NAME = 'electric-boyes-shell-v3';
+var CACHE_NAME = 'electric-boyes-shell-v4';
 var APP_FILES = [
   './',
   './index.html',

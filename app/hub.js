@@ -126,16 +126,24 @@
   function openApp(appId) {
     var app = apps.find(function(item) { return item.id === appId; });
     if (!app || activeAppId === appId) return;
+    if (app.modules.length === 1) {
+      openModuleForApp(app, app.modules[0]);
+      return;
+    }
     window.history.pushState({ ebHubView: 'app', appId: appId }, '', '#app=' + encodeURIComponent(appId));
     setApp(app);
+  }
+
+  function openModuleForApp(app, module) {
+    window.history.pushState({ ebHubView: 'module', appId: app.id, moduleId: module.id }, '', '#app=' + encodeURIComponent(app.id) + '&module=' + encodeURIComponent(module.id));
+    setModule(app, module);
   }
 
   function openModule(moduleId) {
     var app = apps.find(function(item) { return item.id === activeAppId; });
     var module = app && app.modules.find(function(item) { return item.id === moduleId; });
     if (!app || !module || activeModuleId === moduleId) return;
-    window.history.pushState({ ebHubView: 'module', appId: app.id, moduleId: moduleId }, '', '#app=' + encodeURIComponent(app.id) + '&module=' + encodeURIComponent(moduleId));
-    setModule(app, module);
+    openModuleForApp(app, module);
   }
 
   function goBack() {

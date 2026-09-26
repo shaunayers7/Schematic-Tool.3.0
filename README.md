@@ -35,7 +35,7 @@ Browser storage is per browser profile and device. The hub does not sign users i
 
 ## Adding An App Or Module
 
-Only the maintainer adds apps and modules in v1. Each app is an icon on the home screen; tapping it shows that app's modules. Put the module page and its assets in a folder under `tools/`, then add an app with one or more module records to `app/catalog.js`:
+Only the maintainer adds apps and modules in v1. Each app is an icon on the home screen. Apps with one module open it directly; apps with multiple modules show a chooser. Put the module page and its assets in a folder under `tools/`, then add an app with one or more module records to `app/catalog.js`:
 
 ```js
 {
