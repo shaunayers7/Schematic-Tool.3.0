@@ -106,10 +106,40 @@ h1 { margin: 5px 0 0; font-size: 28px; font-weight: 750; line-height: 1.1; lette
 }
 
 @media (min-width: 980px) {
-  .app-shell { min-height: 100vh; }
-  .main-area { width: min(100%, 1080px); align-self: center; }
-  .home-view, .app-view { width: 100%; padding-right: 40px; padding-left: 40px; }
-  .app-grid, .module-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .app-shell { min-height: 100dvh; }
+  .main-area { width: 100%; align-self: stretch; }
+  .home-view, .app-view {
+    display: grid;
+    width: 100%;
+    max-width: none;
+    min-height: calc(100dvh - 58px);
+    grid-template-columns: minmax(250px, .34fr) minmax(0, 1fr);
+    grid-auto-rows: min-content;
+    align-content: start;
+    align-items: start;
+    column-gap: clamp(32px, 5vw, 88px);
+    padding: clamp(36px, 5vh, 64px) clamp(36px, 5vw, 88px) 34px;
+  }
+  .home-view .screen-heading { grid-column: 1; grid-row: 1; margin: 0 0 23px; }
+  .home-view .screen-heading h1 { font-size: 42px; }
+  .home-view .screen-heading p { max-width: 280px; font-size: 13px; }
+  .home-view > .search-box { grid-column: 1; grid-row: 2; max-width: 360px; }
+  .app-grid {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    grid-template-columns: repeat(auto-fill, minmax(112px, 138px));
+    justify-content: start;
+    align-content: start;
+    gap: 34px 27px;
+    padding-top: 7px;
+  }
+  .empty-search { grid-column: 2; grid-row: 3; }
+  .home-dock { grid-column: 1; grid-row: 3; width: 100%; justify-content: flex-start; margin: 0; }
+  .app-view .screen-toolbar { grid-column: 1 / -1; grid-row: 1; width: 100%; margin-bottom: 26px; }
+  .app-view .app-identity { grid-column: 1; grid-row: 2; align-self: start; }
+  .app-view .section-heading { grid-column: 2; grid-row: 2; margin-top: 4px; }
+  .app-view .module-grid { grid-column: 2; grid-row: 3; grid-template-columns: repeat(auto-fill, minmax(112px, 138px)); gap: 34px 27px; }
+  .app-view .add-module-link { grid-column: 2; grid-row: 4; justify-self: start; }
 }
 
 @media (max-width: 380px) {
